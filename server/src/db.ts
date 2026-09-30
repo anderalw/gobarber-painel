@@ -27,6 +27,10 @@ export interface Tenant {
   metrics_at: string | null;
   last_operation: string | null;
   last_log: string | null;
+  // 'new': criada vazia; 'import': a partir de um backup
+  origin: 'new' | 'import';
+  // Backup ainda a restaurar (some depois da importação)
+  import_id: string | null;
   created_at: string;
   updated_at: string;
 }
@@ -82,3 +86,16 @@ db.exec(`
     note TEXT
   );
 `);
+
+// Colunas adicionadas depois da primeira versão
+const columns = (db.prepare('PRAGMA table_info(tenants)').all() as Array<{ name: string }>).map(
+  column => column.name,
+);
+
+if (!columns.includes('origin')) {
+  db.exec("ALTER TABLE tenants ADD COLUMN origin TEXT NOT NULL DEFAULT 'new'");
+}
+
+if (!columns.includes('import_id')) {
+  db.exec('ALTER TABLE tenants ADD COLUMN import_id TEXT');
+}

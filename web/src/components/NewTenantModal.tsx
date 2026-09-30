@@ -24,12 +24,39 @@ interface Props {
 
 interface Created {
   tenant: TenantView;
+  // Vazio na importação (os logins são os do backup)
   admin_password: string;
+}
+
+interface Uploaded {
+  import_id: string;
+  files: number;
+  has_mongo: boolean;
+  has_secret: boolean;
+}
+
+// Envia o backup cru (o servidor extrai e confere)
+async function upload(file: File): Promise<Uploaded> {
+  const response = await fetch('/api/imports', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/octet-stream' },
+    body: file,
+    credentials: 'same-origin',
+  });
+  const data = await response.json().catch(() => ({}));
+
+  if (!response.ok) throw new Error(data.message || 'Não foi possível enviar o backup.');
+
+  return data as Uploaded;
 }
 
 // Nova barbearia: cadastro e, ao salvar, o acesso inicial para entregar ao
 // cliente (o ambiente sobe em segundo plano)
 export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props) {
+  // Começar vazia ou a partir de um backup (uma barbearia que já existe)
+  const [mode, setMode] = useState<'new' | 'import'>('new');
+  const [file, setFile] = useState<File | null>(null);
+  const [stage, setStage] = useState('');
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
   const [slugTouched, setSlugTouched] = useState(false);
@@ -66,10 +93,24 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
       return;
     }
 
+    if (mode === 'import' && !file) {
+      setError('Escolha o arquivo do backup (.tar.gz).');
+      return;
+    }
+
     setSaving(true);
     setError('');
 
     try {
+      let importId: string | undefined;
+
+      if (mode === 'import' && file) {
+        setStage('Enviando e conferindo o backup...');
+        importId = (await upload(file)).import_id;
+      }
+
+      setStage('Criando...');
+
       const result = await api<Created>('/tenants', {
         method: 'POST',
         body: {
@@ -81,6 +122,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
           timezone,
           monthly_price_cents: cents,
           trial_days: Number(trial || 0),
+          import_id: importId,
         },
       });
 
@@ -90,6 +132,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
       setError(err instanceof Error ? err.message : 'Não foi possível criar.');
     } finally {
       setSaving(false);
+      setStage('');
     }
   };
 
@@ -100,7 +143,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
         if (event.target === event.currentTarget && !saving) onClose();
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" style={{ height: 'min(640px, 100%)' }}>
+      <div className="modal" role="dialog" aria-modal="true" style={{ height: 'min(700px, 100%)' }}>
         <header>
           <h2>{created ? 'Barbearia criada' : 'Nova barbearia'}</h2>
           <p>
@@ -122,9 +165,14 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                 </dd>
                 <dt>Entrar em</dt>
                 <dd>{`${created.tenant.url}/barbeiro`}</dd>
-                <dt>E-mail</dt>
-                <dd>{created.tenant.admin_email}</dd>
+                {created.admin_password && (
+                  <>
+                    <dt>E-mail</dt>
+                    <dd>{created.tenant.admin_email}</dd>
+                  </>
+                )}
               </dl>
+              {created.admin_password ? (
               <div className="field">
                 <span>Senha inicial do administrador</span>
                 <div className="secret">
@@ -142,6 +190,12 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                   na página da barbearia.
                 </small>
               </div>
+              ) : (
+                <p className="notice">
+                  Importada de um backup: agenda, clientes, clube e configurações vêm junto, e
+                  todos entram com os mesmos logins e senhas de antes.
+                </p>
+              )}
               <p className="notice">
                 A primeira subida baixa as imagens e prepara o banco: pode levar alguns
                 minutos. Acompanhe na página da barbearia.
@@ -159,6 +213,27 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
         ) : (
           <form onSubmit={submit} style={{ display: 'contents' }}>
             <div className="modal-body stack">
+              <div className="segmented" role="radiogroup" aria-label="Como começar">
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === 'new'}
+                  className={mode === 'new' ? 'selected' : undefined}
+                  onClick={() => setMode('new')}
+                >
+                  Começar do zero
+                </button>
+                <button
+                  type="button"
+                  role="radio"
+                  aria-checked={mode === 'import'}
+                  className={mode === 'import' ? 'selected' : undefined}
+                  onClick={() => setMode('import')}
+                >
+                  Importar de um backup
+                </button>
+              </div>
+
               <label className="field">
                 <span>Nome da barbearia</span>
                 <input
@@ -195,6 +270,21 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                 </label>
               </div>
 
+              {mode === 'import' ? (
+                <label className="field">
+                  <span>Backup (.tar.gz)</span>
+                  <input
+                    className="input file"
+                    type="file"
+                    accept=".tar.gz,.tgz,application/gzip"
+                    onChange={event => setFile(event.target.files?.[0] || null)}
+                  />
+                  <small>
+                    Gerado por scripts/exportar-backup.mjs do GoBarber ou pelo botão Gerar
+                    backup deste painel. Os logins continuam os do backup.
+                  </small>
+                </label>
+              ) : (
               <div className="row">
                 <label className="field">
                   <span>Administrador (nome)</span>
@@ -215,6 +305,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                   />
                 </label>
               </div>
+              )}
 
               <label className="field">
                 <span>Fuso horário</span>
@@ -263,7 +354,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                 Cancelar
               </button>
               <button type="submit" className="btn" disabled={saving}>
-                {saving ? 'Criando...' : 'Criar barbearia'}
+                {saving ? stage || 'Criando...' : mode === 'import' ? 'Importar barbearia' : 'Criar barbearia'}
               </button>
             </footer>
           </form>

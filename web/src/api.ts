@@ -62,6 +62,8 @@ export interface TenantView {
   paid_until: string;
   billing: { state: 'ok' | 'due' | 'late'; days: number };
   status: Status;
+  // 'import': criada a partir de um backup (logins do sistema antigo)
+  origin: 'new' | 'import';
   busy: boolean;
   runtime: Runtime;
   notes: string | null;

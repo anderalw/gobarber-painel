@@ -81,6 +81,27 @@ docker compose -f infra/docker-compose.yml --profile server up -d --build
 
 O painel abre em `https://painel.seudominio.com.br`.
 
+## Importar uma barbearia que já existe (e backups)
+
+O formato de backup é um só () e tem:
+
+- o banco ();
+- as notificações ();
+- as fotos ();
+- o  com o  do sistema.
+
+O  mantém a maquininha e o WhatsApp conectados e os logins válidos.
+
+- **De uma instalação fora do painel** (ex.: o ambiente de desenvolvimento), na
+  pasta do backend: .
+- **De uma barbearia do painel:** botão **Gerar backup** na página dela, depois **Baixar**.
+- **Importar:** **Nova barbearia → Importar de um backup**. O painel sobe os
+  bancos, restaura, liga a API (as migrations novas rodam em cima dos dados)
+  e copia as fotos. Os logins e senhas continuam os de antes.
+
+Serve também para restaurar um backup ou mudar uma barbearia de servidor.
+**O backup tem todos os dados e o segredo do sistema: guarde como uma senha.**
+
 ## Segurança
 
 - O painel comanda o Docker do servidor (`/var/run/docker.sock`), o que

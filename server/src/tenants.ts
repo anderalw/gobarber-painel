@@ -9,6 +9,7 @@ import { compose, containersByProject, ContainerState } from './docker';
 import { buildCaddyfile, loadCaddyfile } from './caddyfile';
 import { billingState, nextPeriod, toDay, trialUntil } from './billing';
 import { envFile, slugify } from './text';
+import { BackupSummary, extract, inspect, pack } from './backup';
 
 export { slugify };
 
@@ -151,6 +152,7 @@ export function view(tenant: Tenant, containers?: ContainerState[]) {
     paid_until: tenant.paid_until,
     billing: billingState(tenant.paid_until, new Date()),
     status: tenant.status,
+    origin: tenant.origin,
     // Uma operação (criar, suspender, atualizar...) em andamento
     busy: running.has(tenant.id),
     runtime: runtimeOf(containers),
@@ -283,7 +285,13 @@ async function waitReady(
   throw new Error('o sistema não respondeu a tempo (veja o log da API).');
 }
 
-function writeFiles(tenant: Tenant, adminPassword: string): void {
+// appSecret: o do sistema importado (mantém maquininha e WhatsApp); sem
+// ele, um novo. adminPassword vazio: não cria admin (o backup já tem)
+function writeFiles(
+  tenant: Tenant,
+  adminPassword: string,
+  appSecret: string = secret(32),
+): void {
   const folder = folderOf(tenant);
 
   fs.mkdirSync(folder, { recursive: true });
@@ -296,28 +304,306 @@ function writeFiles(tenant: Tenant, adminPassword: string): void {
       EDGE_NETWORK: config.edgeNetwork,
       APP_URL: publicUrl(tenant.domain),
       TZ: tenant.timezone,
-      APP_SECRET: secret(32),
+      APP_SECRET: appSecret,
       DB_PASS: secret(16),
       METRICS_TOKEN: secret(24),
       MAIL_DRIVER: 'ethereal',
       GOOGLE_CLIENT_ID: '',
-      ADMIN_NAME: tenant.admin_name,
-      ADMIN_EMAIL: tenant.admin_email,
+      ADMIN_NAME: adminPassword ? tenant.admin_name : '',
+      ADMIN_EMAIL: adminPassword ? tenant.admin_email : '',
       ADMIN_PASSWORD: adminPassword,
     }),
     { mode: 0o600 },
   );
 }
 
+// Caminho do backup extraído, visto da pasta da barbearia (o compose roda lá)
+const importDirOf = (importId: string): string =>
+  path.join(config.dataDir, 'imports', importId);
+
+const fromTenant = (tenant: Tenant, file: string): string =>
+  path.relative(folderOf(tenant), file).split(path.sep).join('/');
+
+// Restaura o backup num ambiente novo: bancos primeiro (sem a API, para as
+// migrations rodarem só depois, em cima dos dados), depois o resto e as fotos
+async function restore(
+  tenant: Tenant,
+  log: (text: string) => void,
+  directory: string,
+): Promise<void> {
+  const file = (name: string) => fromTenant(tenant, path.join(directory, name));
+
+  await run(tenant, log, ['up', '-d', '--wait', 'postgres', 'mongo', 'redis']);
+
+  log('Restaurando o banco principal...');
+  await run(tenant, log, ['cp', file('postgres.sql'), 'postgres:/tmp/restore.sql']);
+  await run(tenant, log, [
+    'exec',
+    '-T',
+    'postgres',
+    'psql',
+    '-U',
+    'postgres',
+    '-d',
+    'gostack_gobarber',
+    '-q',
+    '-v',
+    'ON_ERROR_STOP=1',
+    '-f',
+    '/tmp/restore.sql',
+  ]);
+
+  if (fs.existsSync(path.join(directory, 'mongo.archive'))) {
+    log('Restaurando as notificações...');
+    await run(tenant, log, ['cp', file('mongo.archive'), 'mongo:/tmp/restore.archive']);
+    await run(tenant, log, [
+      'exec',
+      '-T',
+      'mongo',
+      'mongorestore',
+      '--archive=/tmp/restore.archive',
+      '--drop',
+      '--quiet',
+    ]);
+  }
+
+  await run(tenant, log, ['up', '-d']);
+
+  const files = path.join(directory, 'files');
+
+  if (fs.existsSync(files) && fs.readdirSync(files).length > 0) {
+    log('Copiando as fotos...');
+    await run(tenant, log, ['cp', `${file('files')}/.`, 'api:/app/tmp/uploads/']);
+  }
+}
+
+// Administrador principal do sistema importado (para mostrar no painel)
+async function importedAdmin(tenant: Tenant): Promise<{ name: string; email: string } | null> {
+  const result = await compose(projectOf(tenant), folderOf(tenant), [
+    'exec',
+    '-T',
+    'postgres',
+    'psql',
+    '-U',
+    'postgres',
+    '-d',
+    'gostack_gobarber',
+    '-tA',
+    '-F',
+    '|',
+    '-c',
+    'SELECT name, email FROM users WHERE is_admin ORDER BY created_at LIMIT 1',
+  ]);
+  const [name, email] = result.output.trim().split('|');
+
+  return result.ok && email ? { name, email } : null;
+}
+
 function provision(tenant: Tenant): void {
-  operate(tenant, 'Criar ambiente', async log => {
+  const importDir = tenant.import_id ? importDirOf(tenant.import_id) : null;
+
+  operate(tenant, importDir ? 'Importar barbearia' : 'Criar ambiente', async log => {
     if (config.pullImages) await run(tenant, log, ['pull', '--quiet']);
-    await run(tenant, log, ['up', '-d', '--quiet-pull']);
+
+    if (importDir) {
+      // Tentativa anterior pela metade: recomeça com os bancos vazios
+      await run(tenant, log, ['down', '-v']);
+      await restore(tenant, log, importDir);
+    } else {
+      await run(tenant, log, ['up', '-d', '--quiet-pull']);
+    }
+
     await waitReady(tenant, log);
+
+    if (importDir) {
+      const admin = await importedAdmin(tenant);
+
+      if (admin) {
+        update(tenant.id, { admin_name: admin.name, admin_email: admin.email });
+        log(`Administrador do sistema importado: ${admin.email}`);
+      }
+
+      update(tenant.id, { import_id: null });
+      fs.rmSync(importDir, { recursive: true, force: true });
+      fs.rmSync(`${importDir}.tar.gz`, { force: true });
+    }
+
     await refreshMetrics(tenant).catch(() => undefined);
 
     return 'active';
   });
+}
+
+// --- Importação e backups ----------------------------------------------------
+
+// Backup enviado pela tela: extrai e confere antes de criar a barbearia
+export async function receiveImport(
+  body: NodeJS.ReadableStream,
+  maxBytes: number,
+): Promise<{ import_id: string } & BackupSummary> {
+  const importId = randomUUID();
+  const directory = importDirOf(importId);
+  const archive = `${directory}.tar.gz`;
+
+  fs.mkdirSync(path.dirname(archive), { recursive: true });
+
+  let size = 0;
+
+  try {
+    await new Promise<void>((resolve, reject) => {
+      const out = fs.createWriteStream(archive);
+
+      body.on('data', (chunk: Buffer) => {
+        size += chunk.length;
+
+        if (size > maxBytes) {
+          body.unpipe(out);
+          out.destroy();
+          reject(new PanelError('Backup grande demais.', 413));
+        }
+      });
+      body.on('error', reject);
+      out.on('error', reject);
+      out.on('finish', resolve);
+      body.pipe(out);
+    });
+
+    await extract(archive, directory).catch(() => {
+      throw new PanelError('Não foi possível abrir o arquivo (use o .tar.gz do backup).');
+    });
+
+    const { summary } = inspect(directory, size);
+
+    return { import_id: importId, ...summary };
+  } catch (err) {
+    fs.rmSync(directory, { recursive: true, force: true });
+    fs.rmSync(archive, { force: true });
+
+    if (err instanceof PanelError) throw err;
+    throw new PanelError(err instanceof Error ? err.message : 'Backup inválido.');
+  }
+}
+
+// Envios de importação que não viraram barbearia (mais de um dia)
+export function cleanOldImports(): void {
+  const root = path.join(config.dataDir, 'imports');
+
+  if (!fs.existsSync(root)) return;
+
+  const used = new Set(
+    (db.prepare('SELECT import_id FROM tenants WHERE import_id IS NOT NULL').all() as Array<{
+      import_id: string;
+    }>).map(row => row.import_id),
+  );
+
+  fs.readdirSync(root).forEach(name => {
+    const id = name.replace(/\.tar\.gz$/, '');
+    const full = path.join(root, name);
+
+    if (!used.has(id) && Date.now() - fs.statSync(full).mtimeMs > 24 * 60 * 60 * 1000) {
+      fs.rmSync(full, { recursive: true, force: true });
+    }
+  });
+}
+
+const backupsDirOf = (tenant: Pick<Tenant, 'slug'>): string =>
+  path.join(config.dataDir, 'backups', tenant.slug);
+
+// Backup completo de uma barbearia do painel (mesmo formato da importação)
+export function backupTenant(id: string): void {
+  const tenant = findTenant(id);
+
+  if (tenant.status !== 'active') {
+    throw new PanelError('O backup é feito com a barbearia no ar.');
+  }
+
+  operate(tenant, 'Gerar backup', async log => {
+    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+    const directory = path.join(backupsDirOf(tenant), `work-${stamp}`);
+    const file = (name: string) => fromTenant(tenant, path.join(directory, name));
+
+    fs.mkdirSync(path.join(directory, 'files'), { recursive: true });
+
+    try {
+      log('Copiando o banco principal...');
+      await run(tenant, log, [
+        'exec',
+        '-T',
+        'postgres',
+        'sh',
+        '-c',
+        'pg_dump -U postgres -d gostack_gobarber --no-owner --no-acl > /tmp/backup.sql',
+      ]);
+      await run(tenant, log, ['cp', 'postgres:/tmp/backup.sql', file('postgres.sql')]);
+
+      log('Copiando as notificações...');
+      await run(tenant, log, [
+        'exec',
+        '-T',
+        'mongo',
+        'sh',
+        '-c',
+        'mongodump --archive=/tmp/backup.archive --db gostack_gobarber --quiet',
+      ]);
+      await run(tenant, log, ['cp', 'mongo:/tmp/backup.archive', file('mongo.archive')]);
+
+      log('Copiando as fotos...');
+      await run(tenant, log, ['cp', 'api:/app/tmp/uploads/.', `${file('files')}/`]);
+
+      fs.writeFileSync(
+        path.join(directory, 'manifest.json'),
+        JSON.stringify(
+          {
+            format: 'gobarber-backup',
+            version: 1,
+            created_at: new Date().toISOString(),
+            source: `painel:${tenant.slug}`,
+            app_secret: readEnv(tenant).APP_SECRET,
+          },
+          null,
+          2,
+        ),
+      );
+
+      const archive = path.join(backupsDirOf(tenant), `${tenant.slug}-${stamp}.tar.gz`);
+
+      await pack(directory, archive);
+      log(`Backup pronto: ${path.basename(archive)}`);
+    } finally {
+      fs.rmSync(directory, { recursive: true, force: true });
+    }
+
+    return 'active';
+  });
+}
+
+export function listBackups(id: string): Array<{ name: string; size_bytes: number; created_at: string }> {
+  const directory = backupsDirOf(findTenant(id));
+
+  if (!fs.existsSync(directory)) return [];
+
+  return fs
+    .readdirSync(directory)
+    .filter(name => name.endsWith('.tar.gz'))
+    .map(name => {
+      const stat = fs.statSync(path.join(directory, name));
+
+      return { name, size_bytes: stat.size, created_at: stat.mtime.toISOString() };
+    })
+    .sort((a, b) => b.created_at.localeCompare(a.created_at));
+}
+
+// Caminho de um backup para baixar (só nomes da própria pasta)
+export function backupFile(id: string, name: string): string {
+  const tenant = findTenant(id);
+
+  if (!/^[A-Za-z0-9-]+\.tar\.gz$/.test(name)) throw new PanelError('Backup não encontrado.', 404);
+
+  const file = path.join(backupsDirOf(tenant), name);
+
+  if (!fs.existsSync(file)) throw new PanelError('Backup não encontrado.', 404);
+
+  return file;
 }
 
 export interface CreateTenant {
@@ -330,6 +616,8 @@ export interface CreateTenant {
   monthly_price_cents: number;
   trial_days: number;
   notes?: string | null;
+  // Backup enviado antes (receiveImport): a barbearia nasce com esses dados
+  import_id?: string | null;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
@@ -348,9 +636,21 @@ export function createTenant(data: CreateTenant): {
   if (!name) throw new PanelError('Informe o nome da barbearia.');
   if (!slug) throw new PanelError('Informe um identificador (ex.: barbearia-do-ze).');
   if (!DOMAIN.test(domain)) throw new PanelError('Endereço (domínio) inválido.');
-  if (!data.admin_name.trim()) throw new PanelError('Informe o nome do administrador.');
-  if (!EMAIL.test(data.admin_email.trim())) {
-    throw new PanelError('E-mail do administrador inválido.');
+  const importDir = data.import_id ? importDirOf(data.import_id) : null;
+  let importedSecret: string | undefined;
+
+  if (importDir) {
+    if (!/^[0-9a-f-]{36}$/.test(data.import_id as string) || !fs.existsSync(importDir)) {
+      throw new PanelError('Backup não encontrado. Envie o arquivo de novo.');
+    }
+
+    importedSecret = inspect(importDir, 0).manifest.app_secret;
+  } else {
+    // Importada, o admin vem do backup
+    if (!data.admin_name.trim()) throw new PanelError('Informe o nome do administrador.');
+    if (!EMAIL.test(data.admin_email.trim())) {
+      throw new PanelError('E-mail do administrador inválido.');
+    }
   }
 
   try {
@@ -387,8 +687,8 @@ export function createTenant(data: CreateTenant): {
     slug,
     name,
     domain,
-    admin_name: data.admin_name.trim(),
-    admin_email: data.admin_email.trim().toLowerCase(),
+    admin_name: importDir ? '' : data.admin_name.trim(),
+    admin_email: importDir ? '' : data.admin_email.trim().toLowerCase(),
     timezone: data.timezone,
     monthly_price_cents: data.monthly_price_cents,
     paid_until: trialUntil(now, data.trial_days),
@@ -398,14 +698,16 @@ export function createTenant(data: CreateTenant): {
     metrics_at: null,
     last_operation: null,
     last_log: null,
+    origin: importDir ? 'import' : 'new',
+    import_id: importDir ? (data.import_id as string) : null,
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
   };
 
   db.prepare(
     `INSERT INTO tenants (id, slug, name, domain, admin_name, admin_email, timezone,
-      monthly_price_cents, paid_until, status, notes, created_at, updated_at)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      monthly_price_cents, paid_until, status, notes, origin, import_id, created_at, updated_at)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
   ).run(
     tenant.id,
     tenant.slug,
@@ -418,13 +720,17 @@ export function createTenant(data: CreateTenant): {
     tenant.paid_until,
     tenant.status,
     tenant.notes,
+    tenant.origin,
+    tenant.import_id,
     tenant.created_at,
     tenant.updated_at,
   );
 
-  const adminPassword = readablePassword();
+  // Importada: sem admin novo (os logins são os do backup) e com o segredo
+  // antigo, se veio no backup
+  const adminPassword = importDir ? '' : readablePassword();
 
-  writeFiles(tenant, adminPassword);
+  writeFiles(tenant, adminPassword, importedSecret);
   provision(findTenant(tenant.id));
 
   return { tenant: view(tenant), admin_password: adminPassword };

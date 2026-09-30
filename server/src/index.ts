@@ -15,6 +15,11 @@ import {
 } from './auth';
 import {
   PanelError,
+  backupFile,
+  backupTenant,
+  cleanOldImports,
+  listBackups,
+  receiveImport,
   createTenant,
   details,
   editTenant,
@@ -100,6 +105,14 @@ api.get('/me', (request, response) => {
 
 api.use(requireAuth);
 
+// Backup para importar: o arquivo vem cru no corpo (até 2 GB)
+api.post(
+  '/imports',
+  handle(async (request, response) =>
+    response.status(201).json(await receiveImport(request, 2 * 1024 * 1024 * 1024)),
+  ),
+);
+
 api.get('/overview', handle(async (request, response) => response.json(await overview())));
 
 api.post(
@@ -118,6 +131,7 @@ api.post(
         monthly_price_cents: Number(body.monthly_price_cents),
         trial_days: Number(body.trial_days ?? 7),
         notes: body.notes ? String(body.notes) : null,
+        import_id: body.import_id ? String(body.import_id) : null,
       }),
     );
   }),
@@ -186,6 +200,27 @@ api.post(
   }),
 );
 
+api.post(
+  '/tenants/:id/backup',
+  handle(async (request, response) => {
+    backupTenant(request.params.id);
+
+    return response.status(202).json(await details(request.params.id));
+  }),
+);
+
+api.get(
+  '/tenants/:id/backups',
+  handle((request, response) => response.json(listBackups(request.params.id))),
+);
+
+api.get(
+  '/tenants/:id/backups/:name',
+  handle((request, response) => {
+    response.download(backupFile(request.params.id, request.params.name));
+  }),
+);
+
 api.get(
   '/tenants/:id/initial-password',
   handle((request, response) =>
@@ -224,6 +259,7 @@ app.use((err: unknown, request: Request, response: Response, _next: NextFunction
 
 async function start(): Promise<void> {
   recoverInterrupted();
+  cleanOldImports();
   await ensureNetwork(config.edgeNetwork);
 
   // Aplica os endereços no Caddy (se ele ainda não subiu, tenta de novo depois)

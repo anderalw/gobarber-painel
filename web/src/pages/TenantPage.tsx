@@ -15,7 +15,18 @@ import {
 import PaymentModal from '../components/PaymentModal';
 import DeleteModal from '../components/DeleteModal';
 
-type Action = 'suspend' | 'resume' | 'upgrade' | 'retry';
+type Action = 'suspend' | 'resume' | 'upgrade' | 'retry' | 'backup';
+
+interface Backup {
+  name: string;
+  size_bytes: number;
+  created_at: string;
+}
+
+const size = (bytes: number): string =>
+  bytes > 1024 * 1024
+    ? `${(bytes / 1024 / 1024).toFixed(1)} MB`
+    : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 const CONFIRM: Partial<Record<Action, string>> = {
   suspend: 'Suspender? O sistema da barbearia sai do ar (os dados ficam guardados).',
@@ -30,6 +41,7 @@ export default function TenantPage() {
   const [modal, setModal] = useState<'payment' | 'delete' | null>(null);
   const [password, setPassword] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const [backups, setBackups] = useState<Backup[]>([]);
   // Edição dos dados
   const [name, setName] = useState('');
   const [price, setPrice] = useState('');
@@ -54,6 +66,9 @@ export default function TenantPage() {
     api<TenantDetails>(`/tenants/${id}`)
       .then(receive)
       .catch(err => setError(err.message));
+    api<Backup[]>(`/tenants/${id}/backups`)
+      .then(setBackups)
+      .catch(() => undefined);
   }, [id, receive]);
 
   const busy = !!tenant && (tenant.busy || tenant.status === 'provisioning');
@@ -312,6 +327,13 @@ export default function TenantPage() {
               <dt>Fuso</dt>
               <dd>{tenant.timezone}</dd>
             </dl>
+            {tenant.origin === 'import' ? (
+              <p className="notice">
+                Importada de um backup: todos entram com os mesmos logins e senhas do
+                sistema antigo.
+              </p>
+            ) : (
+            <>
             <div className="secret">
               <code>{password ?? '••••••••••••'}</code>
               <button
@@ -336,6 +358,8 @@ export default function TenantPage() {
             <small className="muted">
               Senha criada com a barbearia. Se o cliente já trocou, ela não vale mais.
             </small>
+            </>
+            )}
           </div>
         </section>
 
@@ -425,6 +449,48 @@ export default function TenantPage() {
           </div>
         </section>
       </div>
+
+      <section className="card" style={{ marginTop: 20 }}>
+        <header>
+          <div>
+            <h2>Backups</h2>
+            <p>Banco, notificações, fotos e o segredo do sistema. Guarde com cuidado.</p>
+          </div>
+          <button
+            type="button"
+            className="btn secondary small"
+            disabled={busy || tenant.status !== 'active'}
+            onClick={() => act('backup')}
+          >
+            Gerar backup
+          </button>
+        </header>
+        {backups.length === 0 ? (
+          <p className="empty" style={{ padding: 24 }}>
+            Nenhum backup ainda. Serve para restaurar ou mudar a barbearia de servidor
+            (Nova barbearia → Importar de um backup).
+          </p>
+        ) : (
+          <table>
+            <tbody>
+              {backups.map(backup => (
+                <tr key={backup.name}>
+                  <td>
+                    {backup.name}
+                    <small>{ago(backup.created_at)}</small>
+                  </td>
+                  <td className="num">{size(backup.size_bytes)}</td>
+                  <td className="num">
+                    <a href={`/api/tenants/${id}/backups/${backup.name}`} download>
+                      Baixar
+                    </a>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </section>
 
       {tenant.payments.length > 0 && (
         <section className="card" style={{ marginTop: 20 }}>

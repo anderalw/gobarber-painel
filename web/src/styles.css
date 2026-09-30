@@ -578,3 +578,32 @@ textarea.input {
   margin: 18px 0 4px;
   font-size: 20px;
 }
+
+/* Escolha entre duas opções (ex.: começar do zero / importar) */
+.segmented {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--sunken);
+}
+
+.segmented button {
+  height: 34px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.segmented button.selected {
+  background: var(--hover);
+  color: var(--text);
+}
+
+.input.file {
+  padding: 7px 10px;
+}
