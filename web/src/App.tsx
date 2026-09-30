@@ -29,7 +29,7 @@ export default function App() {
       <div className="topbar">
         <Link to="/" className="brand">
           <span className="mark">✂</span>
-          GoBarber <small>· Painel</small>
+          Pontual <small>· Painel</small>
         </Link>
         <span className="spacer" />
         <span className="muted" style={{ display: 'inline' }}>

@@ -268,7 +268,7 @@ async function start(): Promise<void> {
   );
 
   app.listen(config.port, () => {
-    console.log(`Painel GoBarber em http://localhost:${config.port}`);
+    console.log(`Painel Pontual em http://localhost:${config.port}`);
   });
 
   setInterval(() => {

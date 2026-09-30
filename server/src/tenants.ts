@@ -777,7 +777,7 @@ export function resume(id: string): void {
   });
 }
 
-// Nova versão do GoBarber: baixa as imagens e recria os contêineres (as
+// Nova versão do Pontual: baixa as imagens e recria os contêineres (as
 // migrations novas rodam ao subir)
 export function upgrade(id: string): void {
   const tenant = findTenant(id);
@@ -898,7 +898,7 @@ export function initialPassword(id: string): string {
   return readEnv(findTenant(id)).ADMIN_PASSWORD || '';
 }
 
-// --- Uso (lido do próprio GoBarber, pela rota interna com token) -----------
+// --- Uso (lido do próprio Pontual, pela rota interna com token) -----------
 
 export async function refreshMetrics(tenant: Tenant): Promise<void> {
   const token = readEnv(tenant).METRICS_TOKEN;

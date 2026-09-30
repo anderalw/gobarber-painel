@@ -1,4 +1,4 @@
-# Painel do SaaS GoBarber: API + tela, com o cliente do Docker para criar os
+# Painel do SaaS Pontual: API + tela, com o cliente do Docker para criar os
 # ambientes das barbearias (o socket do Docker vem do servidor)
 FROM node:22-alpine
 

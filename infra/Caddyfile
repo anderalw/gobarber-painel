@@ -8,5 +8,5 @@
 }
 
 :80 {
-	respond "GoBarber: aguardando o painel configurar os endereços." 503
+	respond "Pontual: aguardando o painel configurar os endereços." 503
 }

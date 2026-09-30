@@ -280,7 +280,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                     onChange={event => setFile(event.target.files?.[0] || null)}
                   />
                   <small>
-                    Gerado por scripts/exportar-backup.mjs do GoBarber ou pelo botão Gerar
+                    Gerado por scripts/exportar-backup.mjs do Pontual ou pelo botão Gerar
                     backup deste painel. Os logins continuam os do backup.
                   </small>
                 </label>

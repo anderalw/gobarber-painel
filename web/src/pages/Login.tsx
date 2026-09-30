@@ -28,7 +28,7 @@ export default function Login({ onLogged }: { onLogged(): void }) {
         <div>
           <span className="brand">
             <span className="mark">✂</span>
-            GoBarber <small>· Painel</small>
+            Pontual <small>· Painel</small>
           </span>
           <h1>Entrar no painel</h1>
           <p className="muted">Controle das barbearias do SaaS.</p>

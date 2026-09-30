@@ -1,6 +1,6 @@
-# Painel GoBarber (SaaS)
+# Painel Pontual (SaaS)
 
-O painel de controle do GoBarber. Serve para:
+O painel de controle do Pontual. Serve para:
 
 - cadastrar cada barbearia;
 - subir o ambiente dela com um clique: site, API e bancos próprios, num endereço próprio;
@@ -31,7 +31,7 @@ Só o dono do SaaS entra nele.
   `gobarber-edge`, e emite os certificados HTTPS sozinho. A barbearia
   suspensa ou em preparação mostra um aviso no lugar do site.
 - O **uso** (agendamentos, clientes, faturamento dos últimos 30 dias) vem
-  da rota interna `/internal/metrics` do GoBarber, protegida por um token
+  da rota interna `/internal/metrics` do Pontual, protegida por um token
   que só este painel conhece.
 - **Operações:** criar, suspender, reativar, atualizar versão, tentar de
   novo e excluir. Rodam em segundo plano, e o registro aparece na página
@@ -40,7 +40,7 @@ Só o dono do SaaS entra nele.
 
 ## Testar no computador
 
-Pré-requisitos: Node 22.13+, Yarn e Docker. As imagens do GoBarber
+Pré-requisitos: Node 22.13+, Yarn e Docker. As imagens do Pontual
 precisam estar na máquina: publicadas (`docker login ghcr.io`) ou
 construídas localmente, por exemplo
 `docker build -t gobarber-api:local ../backend-gobarber`.

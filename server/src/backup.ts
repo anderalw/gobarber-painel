@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import { execFile } from 'child_process';
 
-// Formato de backup do GoBarber (o mesmo do scripts/exportar-backup.mjs do
+// Formato de backup do Pontual (o mesmo do scripts/exportar-backup.mjs do
 // backend): .tar.gz com manifest.json, postgres.sql, mongo.archive
 // (opcional) e files/ (fotos)
 
@@ -59,7 +59,7 @@ export function inspect(directory: string, sizeBytes: number): {
   const manifestFile = path.join(directory, 'manifest.json');
 
   if (!fs.existsSync(manifestFile)) {
-    throw new Error('Arquivo não é um backup do GoBarber (falta o manifest.json).');
+    throw new Error('Arquivo não é um backup do Pontual (falta o manifest.json).');
   }
 
   const manifest = JSON.parse(fs.readFileSync(manifestFile, 'utf8')) as Manifest;

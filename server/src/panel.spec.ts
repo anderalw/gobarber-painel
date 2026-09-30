@@ -73,19 +73,19 @@ describe('Caddyfile', () => {
 
   it('should use automatic HTTPS with real domains', () => {
     const file = buildCaddyfile(
-      [{ project: 'gb-ze', domain: 'ze.gobarber.app', status: 'active' }],
+      [{ project: 'gb-ze', domain: 'ze.pontual.app', status: 'active' }],
       {
         ...base,
         tls: 'auto',
-        acmeEmail: 'eu@gobarber.app',
-        panelDomain: 'painel.gobarber.app',
+        acmeEmail: 'eu@pontual.app',
+        panelDomain: 'painel.pontual.app',
       },
     );
 
     expect(file).not.toContain('auto_https off');
-    expect(file).toContain('email eu@gobarber.app');
-    expect(file).toContain('ze.gobarber.app {');
-    expect(file).toContain('painel.gobarber.app {\n\treverse_proxy panel:4000\n}');
+    expect(file).toContain('email eu@pontual.app');
+    expect(file).toContain('ze.pontual.app {');
+    expect(file).toContain('painel.pontual.app {\n\treverse_proxy panel:4000\n}');
     expect(file).not.toContain(':80 {');
   });
 });

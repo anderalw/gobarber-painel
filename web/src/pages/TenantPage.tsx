@@ -30,7 +30,7 @@ const size = (bytes: number): string =>
 
 const CONFIRM: Partial<Record<Action, string>> = {
   suspend: 'Suspender? O sistema da barbearia sai do ar (os dados ficam guardados).',
-  upgrade: 'Atualizar para a versão mais nova do GoBarber? Leva cerca de um minuto.',
+  upgrade: 'Atualizar para a versão mais nova do Pontual? Leva cerca de um minuto.',
 };
 
 export default function TenantPage() {

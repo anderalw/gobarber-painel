@@ -47,7 +47,7 @@ export function buildCaddyfile(sites: Site[], config: Config): string {
     if (site.status === 'suspended') {
       body = page(
         'Sistema temporariamente indisponível',
-        'Entre em contato com o suporte do GoBarber.',
+        'Entre em contato com o suporte do Pontual.',
         503,
       );
     } else if (site.status === 'provisioning') {
@@ -71,7 +71,7 @@ export function buildCaddyfile(sites: Site[], config: Config): string {
 
   // Sem TLS, qualquer outro endereço cai numa resposta curta
   if (config.tls === 'off') {
-    blocks.push(`:80 {\n${page('GoBarber', 'Endereço não encontrado.', 404)}\n}`);
+    blocks.push(`:80 {\n${page('Pontual', 'Endereço não encontrado.', 404)}\n}`);
   }
 
   return `${[global.join('\n'), ...blocks].join('\n\n')}\n`;

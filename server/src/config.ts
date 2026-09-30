@@ -42,9 +42,9 @@ export const config = {
   caddyAdmin: env.CADDY_ADMIN || 'http://127.0.0.1:2019',
   edgeNetwork: env.EDGE_NETWORK || 'gobarber-edge',
 
-  // Imagens publicadas pelo GitHub Actions do GoBarber
-  apiImage: env.API_IMAGE || 'ghcr.io/anderalw/gobarber-api:latest',
-  webImage: env.WEB_IMAGE || 'ghcr.io/anderalw/gobarber-web:latest',
+  // Imagens publicadas pelo GitHub Actions do Pontual
+  apiImage: env.API_IMAGE || 'ghcr.io/anderalw/pontual-api:latest',
+  webImage: env.WEB_IMAGE || 'ghcr.io/anderalw/pontual-web:latest',
   // false: usa só as imagens que já estão na máquina (testes locais)
   pullImages: env.PULL_IMAGES !== 'false',
 };
