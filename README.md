@@ -83,17 +83,17 @@ O painel abre em `https://painel.seudominio.com.br`.
 
 ## Importar uma barbearia que já existe (e backups)
 
-O formato de backup é um só () e tem:
+O formato de backup é um só (`.tar.gz`) e tem:
 
-- o banco ();
-- as notificações ();
-- as fotos ();
-- o  com o  do sistema.
+- o banco (`postgres.sql`);
+- as notificações (`mongo.archive`);
+- as fotos (`files/`);
+- o `manifest.json`, com o `APP_SECRET` do sistema.
 
-O  mantém a maquininha e o WhatsApp conectados e os logins válidos.
+O `APP_SECRET` mantém a maquininha e o WhatsApp conectados e os logins válidos.
 
 - **De uma instalação fora do painel** (ex.: o ambiente de desenvolvimento), na
-  pasta do backend: .
+  pasta do backend: `node scripts/exportar-backup.mjs --out barbearia.tar.gz`.
 - **De uma barbearia do painel:** botão **Gerar backup** na página dela, depois **Baixar**.
 - **Importar:** **Nova barbearia → Importar de um backup**. O painel sobe os
   bancos, restaura, liga a API (as migrations novas rodam em cima dos dados)
@@ -116,7 +116,8 @@ Serve também para restaurar um backup ou mudar uma barbearia de servidor.
 
 O que precisa de backup:
 
-- o volume `panel-data` (banco do painel e `.env` de cada barbearia);
+- o volume `panel-data` (banco do painel, `.env` de cada barbearia e os
+  backups gerados em `backups/`);
 - os volumes `gb-<identificador>_postgres-data`, `_mongo-data` e `_files`
   de cada barbearia.
 
