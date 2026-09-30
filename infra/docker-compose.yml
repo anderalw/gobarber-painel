@@ -1,0 +1,53 @@
+# Servidor do SaaS: o Caddy (porta 80/443, HTTPS automático) na frente de
+# todas as barbearias e o painel que cria e controla os ambientes.
+#
+#   docker network create gobarber-edge      # só na primeira vez
+#   cp .env.example .env                      # e ajuste
+#   docker compose -f infra/docker-compose.yml up -d --build
+#
+# Para testar no computador, dá para subir só o Caddy e rodar o painel com
+# "yarn dev" (veja o README)
+name: gobarber-painel
+
+services:
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - '${PUBLIC_HTTP_PORT:-80}:80'
+      - '${PUBLIC_HTTPS_PORT:-443}:443'
+      # Administração do Caddy: só nesta máquina (o painel em "yarn dev")
+      - '127.0.0.1:2019:2019'
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      # Certificados HTTPS: não se perdem ao recriar o contêiner
+      - caddy-data:/data
+      - caddy-config:/config
+    networks:
+      - edge
+
+  panel:
+    build: ..
+    restart: unless-stopped
+    profiles: ['server']
+    env_file: ../.env
+    environment:
+      DATA_DIR: /data
+      CADDY_ADMIN: http://caddy:2019
+      PANEL_UPSTREAM: panel:4000
+    volumes:
+      # Comanda o Docker do servidor para criar os ambientes
+      - /var/run/docker.sock:/var/run/docker.sock
+      - panel-data:/data
+    networks:
+      - edge
+
+volumes:
+  caddy-data:
+  caddy-config:
+  panel-data:
+
+networks:
+  edge:
+    name: gobarber-edge
+    external: true

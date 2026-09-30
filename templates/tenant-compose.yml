@@ -1,0 +1,91 @@
+# Ambiente de uma barbearia, criado pelo painel. Os valores vêm do .env ao
+# lado. O site entra na rede do Caddy (EDGE_NETWORK), que o publica no
+# domínio da barbearia; nada fica exposto direto no servidor.
+services:
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: gostack_gobarber
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d gostack_gobarber']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 })']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: ${API_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      TZ: ${TZ}
+      APP_SECRET: ${APP_SECRET}
+      APP_API_URL: ${APP_URL}
+      APP_WEB_URL: ${APP_URL}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: ${DB_PASS}
+      DB_NAME: gostack_gobarber
+      MONGO_URL: mongodb://mongo:27017/gostack_gobarber
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      TRUST_PROXY: 2
+      MAIL_DRIVER: ${MAIL_DRIVER}
+      STORAGE_DRIVE: disk
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID}
+      METRICS_TOKEN: ${METRICS_TOKEN}
+      ADMIN_NAME: ${ADMIN_NAME}
+      ADMIN_EMAIL: ${ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD}
+    volumes:
+      - files:/app/tmp
+
+  web:
+    image: ${WEB_IMAGE}
+    restart: unless-stopped
+    depends_on:
+      - api
+    networks:
+      - default
+      - edge
+
+volumes:
+  postgres-data:
+  mongo-data:
+  files:
+
+networks:
+  edge:
+    name: ${EDGE_NETWORK}
+    external: true

@@ -1,0 +1,36 @@
+{
+  "name": "gobarber-painel",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Painel do SaaS GoBarber: cria, sobe e acompanha o ambiente de cada barbearia",
+  "scripts": {
+    "dev": "concurrently -k -n api,web -c yellow,cyan \"tsx watch server/src/index.ts\" \"vite --config web/vite.config.ts\"",
+    "build": "tsc -p server --noEmit && tsc -p web --noEmit && vite build --config web/vite.config.ts",
+    "start": "tsx server/src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p server --noEmit && tsc -p web --noEmit"
+  },
+  "engines": {
+    "node": ">=22.13"
+  },
+  "dependencies": {
+    "date-fns": "3",
+    "express": "4",
+    "react": "18",
+    "react-dom": "18",
+    "react-router-dom": "6",
+    "tsx": "^4.23.15"
+  },
+  "devDependencies": {
+    "@types/express": "4",
+    "@types/node": "22",
+    "@types/react": "18",
+    "@types/react-dom": "18",
+    "@vitejs/plugin-react": "^6.1.1",
+    "concurrently": "^10.0.5",
+    "typescript": "5",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.2"
+  }
+}

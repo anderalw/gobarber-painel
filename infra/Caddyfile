@@ -1,0 +1,12 @@
+# Configuração inicial do Caddy. O painel substitui por completo (API de
+# administração) assim que sobe, com o endereço de cada barbearia
+{
+	admin 0.0.0.0:2019 {
+		origins 127.0.0.1:2019 localhost:2019 caddy:2019
+	}
+	auto_https off
+}
+
+:80 {
+	respond "GoBarber: aguardando o painel configurar os endereços." 503
+}
