@@ -1,4 +1,4 @@
-import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { FormEvent, useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import { api, TenantDetails } from '../api';
@@ -15,7 +15,7 @@ import {
 import PaymentModal from '../components/PaymentModal';
 import DeleteModal from '../components/DeleteModal';
 
-type Action = 'suspend' | 'resume' | 'upgrade' | 'retry' | 'backup';
+type Action = 'suspend' | 'resume';
 
 interface Backup {
   name: string;
@@ -30,7 +30,6 @@ const size = (bytes: number): string =>
 
 const CONFIRM: Partial<Record<Action, string>> = {
   suspend: 'Suspender? O sistema da barbearia sai do ar (os dados ficam guardados).',
-  upgrade: 'Atualizar para a versão mais nova do Pontual? Leva cerca de um minuto.',
 };
 
 export default function TenantPage() {
@@ -47,7 +46,10 @@ export default function TenantPage() {
   const [price, setPrice] = useState('');
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
-  const logRef = useRef<HTMLPreElement>(null);
+  // Domínio próprio
+  const [domain, setDomain] = useState('');
+  const [savingDomain, setSavingDomain] = useState(false);
+  const [backingUp, setBackingUp] = useState(false);
 
   const receive = useCallback((data: TenantDetails) => {
     setTenant(current => {
@@ -56,6 +58,7 @@ export default function TenantPage() {
         setName(data.name);
         setPrice((data.monthly_price_cents / 100).toFixed(2).replace('.', ','));
         setNotes(data.notes || '');
+        setDomain(data.custom_domain || '');
       }
 
       return data;
@@ -71,20 +74,15 @@ export default function TenantPage() {
       .catch(() => undefined);
   }, [id, receive]);
 
-  const busy = !!tenant && (tenant.busy || tenant.status === 'provisioning');
-
   useEffect(() => {
     load();
 
-    const timer = window.setInterval(load, busy ? 2500 : 20000);
+    const timer = window.setInterval(load, 20000);
 
     return () => window.clearInterval(timer);
-  }, [load, busy]);
+  }, [load]);
 
-  // O log acompanha o fim
-  useEffect(() => {
-    if (logRef.current) logRef.current.scrollTop = logRef.current.scrollHeight;
-  }, [tenant?.last_log]);
+  const legacy = tenant?.status === 'legacy';
 
   const act = async (action: Action) => {
     // eslint-disable-next-line no-alert
@@ -95,6 +93,39 @@ export default function TenantPage() {
       setError('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível.');
+    }
+  };
+
+  const saveDomain = async (value: string) => {
+    setSavingDomain(true);
+
+    try {
+      const data = await api<TenantDetails>(`/tenants/${id}/domain`, {
+        method: 'PUT',
+        body: { custom_domain: value.trim() || null },
+      });
+
+      setTenant(data);
+      setDomain(data.custom_domain || '');
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível salvar o domínio.');
+    } finally {
+      setSavingDomain(false);
+    }
+  };
+
+  const backup = async () => {
+    setBackingUp(true);
+
+    try {
+      await api(`/tenants/${id}/backup`, { method: 'POST' });
+      setBackups(await api<Backup[]>(`/tenants/${id}/backups`));
+      setError('');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível gerar o backup.');
+    } finally {
+      setBackingUp(false);
     }
   };
 
@@ -162,7 +193,7 @@ export default function TenantPage() {
         <div>
           <h1 style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
             {tenant.name}
-            <span className={`badge ${state.tone} ${tenant.busy ? 'busy' : ''}`}>
+            <span className={`badge ${state.tone}`}>
               {state.label}
             </span>
           </h1>
@@ -174,46 +205,29 @@ export default function TenantPage() {
           </p>
         </div>
         <div>
-          {tenant.status === 'error' && (
-            <button type="button" className="btn" disabled={busy} onClick={() => act('retry')}>
-              Tentar de novo
+          {tenant.status === 'active' && (
+            <button type="button" className="btn secondary" onClick={() => act('suspend')}>
+              Suspender
             </button>
           )}
-          {tenant.status === 'active' && (
-            <>
-              <button
-                type="button"
-                className="btn secondary"
-                disabled={busy}
-                onClick={() => act('upgrade')}
-              >
-                Atualizar versão
-              </button>
-              <button
-                type="button"
-                className="btn secondary"
-                disabled={busy}
-                onClick={() => act('suspend')}
-              >
-                Suspender
-              </button>
-            </>
-          )}
           {tenant.status === 'suspended' && (
-            <button type="button" className="btn" disabled={busy} onClick={() => act('resume')}>
+            <button type="button" className="btn" onClick={() => act('resume')}>
               Reativar
             </button>
           )}
-          <button
-            type="button"
-            className="btn danger"
-            disabled={busy}
-            onClick={() => setModal('delete')}
-          >
+          <button type="button" className="btn danger" onClick={() => setModal('delete')}>
             Excluir
           </button>
         </div>
       </div>
+
+      {legacy && (
+        <p className="notice" style={{ marginBottom: 12 }}>
+          Esta barbearia é do modelo antigo, com contêineres próprios, e ainda não está na
+          instalação compartilhada. Gere o backup dela (scripts/exportar-backup.mjs) e use
+          Nova barbearia → Importar de um backup com o mesmo identificador.
+        </p>
+      )}
 
       {/* Espaço reservado para mensagens de erro */}
       <span className="error-text" role="alert" style={{ marginBottom: 12 }}>
@@ -232,7 +246,7 @@ export default function TenantPage() {
             <button
               type="button"
               className="btn ghost small"
-              disabled={refreshing || tenant.status !== 'active'}
+              disabled={refreshing || legacy}
               onClick={refreshMetrics}
             >
               {refreshing ? 'Lendo...' : 'Atualizar'}
@@ -299,12 +313,7 @@ export default function TenantPage() {
                 Registrar pagamento
               </button>
               {tenant.billing.state === 'late' && tenant.status === 'active' && (
-                <button
-                  type="button"
-                  className="btn secondary"
-                  disabled={busy}
-                  onClick={() => act('suspend')}
-                >
+                <button type="button" className="btn secondary" onClick={() => act('suspend')}>
                   Suspender por atraso
                 </button>
               )}
@@ -323,14 +332,15 @@ export default function TenantPage() {
               <dt>Entrar em</dt>
               <dd>{`${tenant.url}/barbeiro`}</dd>
               <dt>Administrador</dt>
-              <dd>{`${tenant.admin_name} · ${tenant.admin_email}`}</dd>
-              <dt>Fuso</dt>
-              <dd>{tenant.timezone}</dd>
+              <dd>
+                {tenant.admin_email ? `${tenant.admin_name} · ${tenant.admin_email}` : '–'}
+              </dd>
             </dl>
-            {tenant.origin === 'import' ? (
+            {!tenant.has_initial_password ? (
               <p className="notice">
-                Importada de um backup: todos entram com os mesmos logins e senhas do
-                sistema antigo.
+                {tenant.origin === 'import'
+                  ? 'Importada de um backup: todos entram com os mesmos logins e senhas de antes.'
+                  : 'Já existia na instalação: os logins são os que a barbearia já usava.'}
               </p>
             ) : (
             <>
@@ -402,72 +412,71 @@ export default function TenantPage() {
         </section>
       </div>
 
-      <div className="grid-2">
-        <section className="card">
-          <header>
-            <div>
-              <h2>Ambiente</h2>
-              <p>{`Projeto gb-${tenant.slug} no Docker`}</p>
-            </div>
-          </header>
-          <table>
-            <tbody>
-              {tenant.containers.length === 0 && (
-                <tr>
-                  <td className="muted">Nenhum contêiner (ainda não criado ou excluído).</td>
-                </tr>
-              )}
-              {tenant.containers.map(container => (
-                <tr key={container.service}>
-                  <td>{container.service}</td>
-                  <td className="num">
-                    <span
-                      className={`badge ${container.state === 'running' ? 'success' : 'danger'}`}
-                    >
-                      {container.state === 'running' ? 'rodando' : container.state}
-                      {container.health === 'healthy' && ' · saudável'}
-                      {container.health === 'unhealthy' && ' · com problema'}
-                    </span>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
-
-        <section className="card">
-          <header>
-            <div>
-              <h2>Última operação</h2>
-              <p>{tenant.last_operation || 'Nenhuma'}</p>
-            </div>
-          </header>
-          <div className="card-body">
-            <pre className="log" ref={logRef}>
-              {tenant.last_log || 'Sem registro.'}
-            </pre>
+      <section className="card">
+        <header>
+          <div>
+            <h2>Endereço</h2>
+            <p>{`Sempre disponível em ${tenant.subdomain}`}</p>
           </div>
-        </section>
-      </div>
+        </header>
+        <div className="card-body stack">
+          <div className="row" style={{ alignItems: 'flex-end' }}>
+            <label className="field">
+              <span>Domínio próprio</span>
+              <input
+                className="input"
+                value={domain}
+                placeholder="barbeariadoze.com.br"
+                disabled={legacy}
+                onChange={event => setDomain(event.target.value)}
+              />
+            </label>
+            <div style={{ display: 'flex', gap: 8 }}>
+              <button
+                type="button"
+                className="btn secondary"
+                disabled={legacy || savingDomain || domain.trim() === (tenant.custom_domain || '')}
+                onClick={() => saveDomain(domain)}
+              >
+                {savingDomain ? 'Salvando...' : 'Salvar domínio'}
+              </button>
+              {tenant.custom_domain && (
+                <button
+                  type="button"
+                  className="btn ghost"
+                  disabled={savingDomain}
+                  onClick={() => saveDomain('')}
+                >
+                  Remover
+                </button>
+              )}
+            </div>
+          </div>
+          <small className="muted">
+            No DNS do domínio, crie um CNAME (ou um registro A) apontando para o servidor do
+            Pontual. O certificado HTTPS sai sozinho no primeiro acesso.
+          </small>
+        </div>
+      </section>
 
       <section className="card" style={{ marginTop: 20 }}>
         <header>
           <div>
             <h2>Backups</h2>
-            <p>Banco, notificações, fotos e o segredo do sistema. Guarde com cuidado.</p>
+            <p>Os dados da barbearia, as fotos e o segredo das integrações. Guarde com cuidado.</p>
           </div>
           <button
             type="button"
             className="btn secondary small"
-            disabled={busy || tenant.status !== 'active'}
-            onClick={() => act('backup')}
+            disabled={legacy || backingUp}
+            onClick={backup}
           >
-            Gerar backup
+            {backingUp ? 'Gerando...' : 'Gerar backup'}
           </button>
         </header>
         {backups.length === 0 ? (
           <p className="empty" style={{ padding: 24 }}>
-            Nenhum backup ainda. Serve para restaurar ou mudar a barbearia de servidor
+            Nenhum backup ainda. Serve para restaurar a barbearia ou mudar de servidor
             (Nova barbearia → Importar de um backup).
           </p>
         ) : (

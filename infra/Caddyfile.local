@@ -1,0 +1,14 @@
+# Teste no computador: só HTTP, sem certificados.
+#   http://painel.localhost          -> painel
+#   http://<barbearia>.localhost     -> site da barbearia
+{
+	auto_https off
+}
+
+http://{$PANEL_DOMAIN} {
+	reverse_proxy panel:4000
+}
+
+http:// {
+	reverse_proxy web:80
+}

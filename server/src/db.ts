@@ -4,19 +4,23 @@ import { DatabaseSync } from 'node:sqlite';
 
 import { config } from './config';
 
-export type TenantStatus =
-  | 'provisioning'
-  | 'active'
-  | 'suspended'
-  | 'error';
+// 'legacy': do tempo em que cada barbearia tinha os próprios contêineres e
+// ainda não está na API (importe o backup dela)
+export type TenantStatus = 'active' | 'suspended' | 'legacy';
 
 export interface Tenant {
   id: string;
+  // Id da barbearia na API do Pontual (vazio nas antigas)
+  api_id: string | null;
   slug: string;
   name: string;
+  // Endereço principal: o domínio próprio ou <slug>.<BASE_DOMAIN>
   domain: string;
+  custom_domain: string | null;
   admin_name: string;
   admin_email: string;
+  // Senha criada com a barbearia (o cliente pode ter trocado)
+  initial_password: string | null;
   timezone: string;
   monthly_price_cents: number;
   // 'yyyy-MM-dd', exclusivo: pago até a véspera
@@ -25,12 +29,9 @@ export interface Tenant {
   notes: string | null;
   metrics_json: string | null;
   metrics_at: string | null;
-  last_operation: string | null;
-  last_log: string | null;
-  // 'new': criada vazia; 'import': a partir de um backup
-  origin: 'new' | 'import';
-  // Backup ainda a restaurar (some depois da importação)
-  import_id: string | null;
+  // 'new': criada vazia; 'import': a partir de um backup; 'found': já
+  // existia na API (ex.: a barbearia da instalação de antes)
+  origin: 'new' | 'import' | 'found';
   created_at: string;
   updated_at: string;
 }
@@ -92,10 +93,22 @@ const columns = (db.prepare('PRAGMA table_info(tenants)').all() as Array<{ name:
   column => column.name,
 );
 
-if (!columns.includes('origin')) {
-  db.exec("ALTER TABLE tenants ADD COLUMN origin TEXT NOT NULL DEFAULT 'new'");
-}
+const added: Record<string, string> = {
+  origin: "TEXT NOT NULL DEFAULT 'new'",
+  import_id: 'TEXT',
+  api_id: 'TEXT',
+  custom_domain: 'TEXT',
+  initial_password: 'TEXT',
+};
 
-if (!columns.includes('import_id')) {
-  db.exec('ALTER TABLE tenants ADD COLUMN import_id TEXT');
-}
+Object.entries(added).forEach(([name, definition]) => {
+  if (!columns.includes(name)) {
+    db.exec(`ALTER TABLE tenants ADD COLUMN ${name} ${definition}`);
+  }
+});
+
+// Barbearias do tempo dos contêineres separados (preparando, com erro...)
+// ainda sem lugar na API
+db.exec(
+  "UPDATE tenants SET status = 'legacy' WHERE api_id IS NULL AND status NOT IN ('legacy')",
+);

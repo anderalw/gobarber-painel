@@ -2,136 +2,156 @@
 
 O painel de controle do Pontual. Serve para:
 
-- cadastrar cada barbearia;
-- subir o ambiente dela com um clique: site, API e bancos próprios, num endereço próprio;
+- cadastrar cada barbearia (ela nasce no ar, com endereço próprio);
+- configurar o domínio próprio dela;
 - acompanhar o uso;
-- controlar a mensalidade que ela paga a você.
+- controlar a mensalidade que ela paga a você;
+- gerar e restaurar backups.
 
 Só o dono do SaaS entra nele.
 
 ## Como funciona
 
 ```
-                 ┌──────────── servidor ─────────────────────────┐
- ze.seu.app ───► │ Caddy (80/443, HTTPS) ─► gb-ze   (site+API+bancos)
- cia.seu.app ──► │                        ─► gb-cia  (site+API+bancos)
- painel.seu.app ►│                        ─► painel ─► Docker (cria/para/atualiza)
-                 └───────────────────────────────────────────────┘
+                  ┌──────────────── servidor (um docker compose) ─────────────────┐
+ ze.seu.app ────► │ Caddy (80/443) ─► site ─► API do Pontual ─► Postgres/Mongo/Redis
+ cia.com.br ────► │      │                       ▲
+ painel.seu.app ► │      └──────────► painel ────┘ (rotas da plataforma)
+                  └────────────────────────────────────────────────────────────────┘
 ```
 
-- **Uma barbearia = um projeto do Docker** (`gb-<identificador>`), com o
-  compose de `templates/tenant-compose.yml` e um `.env` gerado:
-  - senhas e segredos aleatórios;
-  - o primeiro administrador;
-  - o fuso;
-  - o token de uso.
+- **Uma instalação para todas as barbearias.** A API do Pontual descobre a
+  barbearia pelo endereço:
+  - `<identificador>.BASE_DOMAIN`;
+  - ou o domínio próprio dela.
 
-  Os arquivos ficam em `data/tenants/<identificador>/`.
-- O **Caddy** liga cada domínio ao site da barbearia, pela rede
-  `gobarber-edge`, e emite os certificados HTTPS sozinho. A barbearia
-  suspensa ou em preparação mostra um aviso no lugar do site.
-- O **uso** (agendamentos, clientes, faturamento dos últimos 30 dias) vem
-  da rota interna `/internal/metrics` do Pontual, protegida por um token
-  que só este painel conhece.
-- **Operações:** criar, suspender, reativar, atualizar versão, tentar de
-  novo e excluir. Rodam em segundo plano, e o registro aparece na página
-  da barbearia.
-- O banco do painel é um arquivo SQLite (`data/painel.db`).
+  O Postgres isola os dados: cada linha tem a barbearia, e o banco só mostra
+  as da barbearia da requisição (RLS).
+- **O painel não mexe no Docker.** Ele conversa com a API pelas rotas da
+  plataforma (`/internal`, protegidas pelo `PLATFORM_TOKEN`):
+  - criar, suspender, reativar e excluir;
+  - domínio próprio;
+  - uso de cada barbearia;
+  - backup e importação.
 
-## Testar no computador
+  O painel guarda só a cobrança e as anotações (`data/painel.db`, SQLite).
+- **HTTPS sob demanda.** O Caddy emite o certificado de cada endereço no
+  primeiro acesso, depois de perguntar à API se ele é de uma barbearia
+  cadastrada. Barbearia nova ou domínio novo não precisam de configuração no
+  servidor.
+- **Atualizar a versão** atualiza todas as barbearias de uma vez:
 
-Pré-requisitos: Node 22.13+, Yarn e Docker. As imagens do Pontual
-precisam estar na máquina: publicadas (`docker login ghcr.io`) ou
-construídas localmente, por exemplo
-`docker build -t gobarber-api:local ../backend-gobarber`.
+  ```bash
+  docker compose -f infra/docker-compose.yml pull
+  docker compose -f infra/docker-compose.yml up -d
+  ```
 
-```bash
-yarn install
-cp .env.example .env
-# no .env: PANEL_EMAIL, PANEL_PASSWORD, SESSION_SECRET; para imagens locais:
-#   API_IMAGE=gobarber-api:local  WEB_IMAGE=gobarber-web:local  PULL_IMAGES=false
-
-docker network create gobarber-edge
-docker compose -f infra/docker-compose.yml up -d caddy
-yarn dev
-```
-
-Abra `http://localhost:4001`. Cada barbearia fica em
-`http://<identificador>.localhost`, porque o navegador já entende
-`*.localhost` como o próprio computador.
+  As migrations rodam ao subir a API.
 
 ## No servidor
 
-1. Aponte o DNS:
-   - `*.seudominio.com.br` para o IP do servidor, cobrindo as barbearias;
-   - `painel.seudominio.com.br` para o mesmo IP.
-2. Configure o `.env`:
-   - `BASE_DOMAIN=seudominio.com.br`;
-   - `TLS=auto`;
-   - `ACME_EMAIL=voce@...`;
-   - `PANEL_DOMAIN=painel.seudominio.com.br`;
-   - as imagens publicadas (`ghcr.io/...`).
-3. Se as imagens forem privadas: `docker login ghcr.io`.
-4. Suba tudo:
+1. **DNS:**
+   - `*.seudominio.com.br` e `painel.seudominio.com.br` apontando para o IP
+     do servidor.
+   - Domínio próprio de uma barbearia: um CNAME (ou registro A) para o
+     servidor. Depois, configure o domínio na página dela no painel.
+2. **`.env`** (a partir do `.env.example`):
+   - `BASE_DOMAIN`;
+   - `PANEL_DOMAIN`;
+   - `ACME_EMAIL`;
+   - as senhas e os segredos (`openssl rand -hex 32`).
+3. **Imagens privadas:** faça antes `docker login ghcr.io`.
+4. **Suba tudo:**
 
 ```bash
-docker network create gobarber-edge
-docker compose -f infra/docker-compose.yml --profile server up -d --build
+docker compose -f infra/docker-compose.yml up -d
 ```
 
 O painel abre em `https://painel.seudominio.com.br`.
 
-## Importar uma barbearia que já existe (e backups)
+O Let's Encrypt emite até 50 certificados novos por semana para o mesmo
+domínio. Com mais barbearias novas que isso por semana, troque os
+certificados por subdomínio por um certificado curinga (`*.seudominio`),
+que exige o desafio por DNS.
 
-O formato de backup é um só (`.tar.gz`) e tem:
+## Testar no computador
 
-- o banco (`postgres.sql`);
-- as notificações (`mongo.archive`);
-- as fotos (`files/`);
-- o `manifest.json`, com o `APP_SECRET` do sistema.
+**A instalação inteira**, sem HTTPS. No `.env`:
 
-O `APP_SECRET` mantém a maquininha e o WhatsApp conectados e os logins válidos.
+- `CADDYFILE=Caddyfile.local`;
+- `PUBLIC_HTTP_PORT=8088` (se a 80 estiver ocupada);
+- `TENANT_WEB_URL=http://{host}:8088`.
 
-- **De uma instalação fora do painel** (ex.: o ambiente de desenvolvimento), na
-  pasta do backend: `node scripts/exportar-backup.mjs --out barbearia.tar.gz`.
-- **De uma barbearia do painel:** botão **Gerar backup** na página dela, depois **Baixar**.
-- **Importar:** **Nova barbearia → Importar de um backup**. O painel sobe os
-  bancos, restaura, liga a API (as migrations novas rodam em cima dos dados)
-  e copia as fotos. Os logins e senhas continuam os de antes.
+```bash
+docker compose -f infra/docker-compose.yml up -d --build
+```
 
-Serve também para restaurar um backup ou mudar uma barbearia de servidor.
-**O backup tem todos os dados e o segredo do sistema: guarde como uma senha.**
+O painel abre em `http://painel.localhost:8088`. Cada barbearia fica em
+`http://<identificador>.localhost:8088`, porque o navegador entende
+`*.localhost` como o próprio computador.
+
+**Só o painel, com recarga**, com a API do Pontual rodando em
+`localhost:3333` e o mesmo `PLATFORM_TOKEN` nos dois `.env`:
+
+```bash
+yarn install
+yarn dev   # painel em http://localhost:4001
+```
+
+## Backups e importação
+
+**Gerar backup**, na página da barbearia, cria um `.tar.gz` só daquela
+barbearia, guardado no painel. Ele tem:
+
+- os dados;
+- as notificações;
+- as fotos;
+- o segredo das integrações (maquininha, WhatsApp).
+
+**Nova barbearia → Importar de um backup** cria a barbearia com os dados do
+arquivo. Os logins e senhas continuam os mesmos. Aceita:
+
+- os backups do painel;
+- o backup de uma instalação antiga, de uma barbearia só
+  (`node scripts/exportar-backup.mjs` na pasta do backend). As notificações
+  antigas não vêm junto.
+
+Barbearias do modelo antigo, com contêineres próprios, aparecem como
+**Modelo antigo**. Gere o backup delas e importe-o com o mesmo identificador.
+
+**Guarde os backups como uma senha:** eles têm todos os dados da barbearia.
+
+O que precisa de backup no servidor:
+
+- os volumes `postgres-data`, `mongo-data` e `files` (todas as barbearias);
+- o volume `panel-data` (cobrança e os backups gerados).
+
+Por exemplo, o banco inteiro:
+
+```bash
+docker compose -f infra/docker-compose.yml exec postgres pg_dump -U postgres gostack_gobarber > pontual.sql
+```
+
+## Limites desta versão
+
+- **Fuso horário:** todas as barbearias da instalação usam o mesmo fuso
+  (`TZ`).
+- **Login com Google:** o Google exige cadastrar cada endereço (origem) no
+  client id. Com muitos subdomínios, só vale para quem você cadastrar lá.
 
 ## Segurança
 
-- O painel comanda o Docker do servidor (`/var/run/docker.sock`), o que
-  equivale a acesso de administrador à máquina. Use uma senha forte, deixe o
-  painel só no seu domínio e mantenha o servidor atualizado.
+- O painel só fala com a API (token da plataforma): não tem acesso ao Docker
+  nem ao servidor. Use uma senha forte e deixe o painel só no seu domínio.
 - O login trava por alguns minutos depois de 5 tentativas erradas.
-- Os `.env` das barbearias ficam só no servidor, com permissão restrita.
-  A "senha inicial" do admin é a da criação; se o cliente trocou, ela não
-  vale mais.
-
-## Backup
-
-O que precisa de backup:
-
-- o volume `panel-data` (banco do painel, `.env` de cada barbearia e os
-  backups gerados em `backups/`);
-- os volumes `gb-<identificador>_postgres-data`, `_mongo-data` e `_files`
-  de cada barbearia.
-
-Por exemplo:
-
-```bash
-docker compose -p gb-ze exec postgres pg_dump -U postgres gostack_gobarber > ze.sql
-```
+- As rotas da plataforma não passam pelo site: o nginx dele devolve 404 em
+  `/api/internal`.
 
 ## Comandos
 
 | Comando | Para quê |
 | --- | --- |
 | `yarn dev` | Painel (4000) + tela (4001) com recarga |
-| `yarn test` | Testes (cobrança, Caddyfile, textos) |
+| `yarn test` | Testes (cobrança, identificador) |
 | `yarn build` | Tipos + build da tela |
 | `yarn start` | Produção (serve a tela do build) |

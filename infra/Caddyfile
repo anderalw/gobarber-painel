@@ -1,12 +1,25 @@
-# Configuração inicial do Caddy. O painel substitui por completo (API de
-# administração) assim que sobe, com o endereço de cada barbearia
+# Servidor de verdade: HTTPS automático em todos os endereços.
+#
+# O painel fica no PANEL_DOMAIN. Qualquer outro endereço vai para o site do
+# Pontual, que descobre a barbearia pelo próprio endereço. O certificado de
+# cada um sai no primeiro acesso ("on demand"), só depois de a API confirmar
+# que o endereço é de uma barbearia cadastrada (subdomínio ou domínio próprio)
 {
-	admin 0.0.0.0:2019 {
-		origins 127.0.0.1:2019 localhost:2019 caddy:2019
+	email {$ACME_EMAIL}
+
+	on_demand_tls {
+		ask http://api:3333/internal/domains/check
 	}
-	auto_https off
 }
 
-:80 {
-	respond "Pontual: aguardando o painel configurar os endereços." 503
+{$PANEL_DOMAIN} {
+	reverse_proxy panel:4000
+}
+
+https:// {
+	tls {
+		on_demand
+	}
+
+	reverse_proxy web:80
 }

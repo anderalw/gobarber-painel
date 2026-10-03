@@ -1,13 +1,17 @@
-# Servidor do SaaS: o Caddy (porta 80/443, HTTPS automático) na frente de
-# todas as barbearias e o painel que cria e controla os ambientes.
+# Servidor do SaaS Pontual: tudo numa instalação só.
 #
-#   docker network create gobarber-edge      # só na primeira vez
-#   cp .env.example .env                      # e ajuste
-#   docker compose -f infra/docker-compose.yml up -d --build
+#   Caddy (80/443) ─┬─ painel.seudominio  ─► painel (cadastro e cobrança)
+#                   └─ qualquer outro      ─► site ─► API ─► Postgres/Mongo/Redis
 #
-# Para testar no computador, dá para subir só o Caddy e rodar o painel com
-# "yarn dev" (veja o README)
-name: gobarber-painel
+# Cada barbearia abre em <identificador>.BASE_DOMAIN ou no domínio próprio.
+# O certificado HTTPS de cada endereço sai no primeiro acesso, depois de a
+# API confirmar que ele é de uma barbearia cadastrada.
+#
+#   cp .env.example .env                       # e ajuste
+#   docker compose -f infra/docker-compose.yml up -d
+#
+# Para testar no computador, sem HTTPS: CADDYFILE=Caddyfile.local no .env
+name: pontual
 
 services:
   caddy:
@@ -16,38 +20,116 @@ services:
     ports:
       - '${PUBLIC_HTTP_PORT:-80}:80'
       - '${PUBLIC_HTTPS_PORT:-443}:443'
-      # Administração do Caddy: só nesta máquina (o painel em "yarn dev")
-      - '127.0.0.1:2019:2019'
+    environment:
+      PANEL_DOMAIN: ${PANEL_DOMAIN:-painel.localhost}
+      ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
       # Certificados HTTPS: não se perdem ao recriar o contêiner
       - caddy-data:/data
       - caddy-config:/config
-    networks:
-      - edge
+    depends_on:
+      - web
+      - panel
+
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${DB_PASS:?defina DB_PASS no .env}
+      POSTGRES_DB: gostack_gobarber
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U postgres -d gostack_gobarber']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      test: ['CMD', 'mongosh', '--quiet', '--eval', 'db.runCommand({ ping: 1 })']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  api:
+    image: ${API_IMAGE:-ghcr.io/anderalw/pontual-api:latest}
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    environment:
+      APP_SECRET: ${APP_SECRET:?defina APP_SECRET no .env}
+      # Fuso de todas as barbearias desta instalação
+      TZ: ${TZ:-America/Sao_Paulo}
+      BASE_DOMAIN: ${BASE_DOMAIN:?defina BASE_DOMAIN no .env}
+      # Links dos e-mails e do WhatsApp ({host} = endereço da barbearia)
+      TENANT_WEB_URL: ${TENANT_WEB_URL:-https://{host}}
+      PLATFORM_TOKEN: ${PLATFORM_TOKEN:?defina PLATFORM_TOKEN no .env}
+      DB_HOST: postgres
+      DB_PORT: 5432
+      DB_USER: postgres
+      DB_PASS: ${DB_PASS}
+      DB_NAME: gostack_gobarber
+      MONGO_URL: mongodb://mongo:27017/gostack_gobarber
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      # Caddy e o nginx do site, nessa ordem, repassam o IP do cliente
+      TRUST_PROXY: 2
+      MAIL_DRIVER: ${MAIL_DRIVER:-ethereal}
+      MAIL_FROM: ${MAIL_FROM:-}
+      STORAGE_DRIVE: ${STORAGE_DRIVE:-disk}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+    volumes:
+      - files:/app/tmp
+
+  web:
+    image: ${WEB_IMAGE:-ghcr.io/anderalw/pontual-web:latest}
+    restart: unless-stopped
+    depends_on:
+      - api
 
   panel:
+    image: ${PANEL_IMAGE:-ghcr.io/anderalw/pontual-painel:latest}
     build: ..
     restart: unless-stopped
-    profiles: ['server']
-    env_file: ../.env
     environment:
+      PANEL_EMAIL: ${PANEL_EMAIL:?defina PANEL_EMAIL no .env}
+      PANEL_PASSWORD: ${PANEL_PASSWORD:?defina PANEL_PASSWORD no .env}
+      SESSION_SECRET: ${SESSION_SECRET:?defina SESSION_SECRET no .env}
+      PLATFORM_TOKEN: ${PLATFORM_TOKEN}
+      PONTUAL_API: http://api:3333
+      BASE_DOMAIN: ${BASE_DOMAIN}
+      SITE_URL: ${TENANT_WEB_URL:-https://{host}}
       DATA_DIR: /data
-      CADDY_ADMIN: http://caddy:2019
-      PANEL_UPSTREAM: panel:4000
     volumes:
-      # Comanda o Docker do servidor para criar os ambientes
-      - /var/run/docker.sock:/var/run/docker.sock
       - panel-data:/data
-    networks:
-      - edge
+    depends_on:
+      - api
 
 volumes:
   caddy-data:
   caddy-config:
+  postgres-data:
+  mongo-data:
+  files:
   panel-data:
-
-networks:
-  edge:
-    name: gobarber-edge
-    external: true

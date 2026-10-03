@@ -31,8 +31,7 @@ export async function api<T>(
   return data as T;
 }
 
-export type Runtime = 'online' | 'starting' | 'stopped' | 'partial' | 'absent';
-export type Status = 'provisioning' | 'active' | 'suspended' | 'error';
+export type Status = 'active' | 'suspended' | 'legacy';
 
 export interface Metrics {
   generated_at: string;
@@ -53,28 +52,27 @@ export interface TenantView {
   id: string;
   slug: string;
   name: string;
+  // Endereço principal (o domínio próprio ou o subdomínio)
   domain: string;
+  custom_domain: string | null;
+  subdomain: string;
   url: string;
   admin_name: string;
   admin_email: string;
-  timezone: string;
   monthly_price_cents: number;
   paid_until: string;
   billing: { state: 'ok' | 'due' | 'late'; days: number };
   status: Status;
-  // 'import': criada a partir de um backup (logins do sistema antigo)
-  origin: 'new' | 'import';
-  busy: boolean;
-  runtime: Runtime;
+  // 'import': de um backup (logins de antes); 'found': já estava na API
+  origin: 'new' | 'import' | 'found';
+  has_initial_password: boolean;
   notes: string | null;
   metrics: Metrics | null;
   metrics_at: string | null;
-  last_operation: string | null;
   created_at: string;
 }
 
 export interface TenantDetails extends TenantView {
-  containers: Array<{ service: string; state: string; health: string }>;
   payments: Array<{
     id: string;
     amount_cents: number;
@@ -84,13 +82,12 @@ export interface TenantDetails extends TenantView {
     paid_at: string;
     note: string | null;
   }>;
-  last_log: string | null;
 }
 
 export interface Overview {
   summary: {
     total: number;
-    online: number;
+    active: number;
     suspended: number;
     late: number;
     monthly_cents: number;
@@ -101,8 +98,4 @@ export interface Overview {
 export interface Me {
   email: string;
   base_domain: string;
-  tls: 'auto' | 'off';
-  public_port: number;
-  api_image: string;
-  web_image: string;
 }

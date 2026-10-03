@@ -8,10 +8,9 @@ interface Props {
   onDeleted(): void;
 }
 
-// Excluir exige digitar o identificador; apagar os dados é uma escolha à parte
+// Excluir apaga a barbearia e todos os dados dela: exige digitar o identificador
 export default function DeleteModal({ tenant, onClose, onDeleted }: Props) {
   const [typed, setTyped] = useState('');
-  const [purge, setPurge] = useState(false);
   const [error, setError] = useState('');
   const [deleting, setDeleting] = useState(false);
 
@@ -31,7 +30,7 @@ export default function DeleteModal({ tenant, onClose, onDeleted }: Props) {
     setError('');
 
     try {
-      await api(`/tenants/${tenant.id}${purge ? '?purge=1' : ''}`, { method: 'DELETE' });
+      await api(`/tenants/${tenant.id}`, { method: 'DELETE' });
       onDeleted();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Não foi possível excluir.');
@@ -59,13 +58,13 @@ export default function DeleteModal({ tenant, onClose, onDeleted }: Props) {
         </header>
         <div className="modal-body stack">
           <p>
-            O sistema sai do ar e some do painel. Sem marcar a opção abaixo, os dados
-            (banco e fotos) ficam guardados no servidor.
+            O sistema sai do ar e todos os dados da barbearia são apagados: agenda,
+            clientes, clube, caixa e fotos. Não tem volta.
           </p>
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <input type="checkbox" checked={purge} onChange={event => setPurge(event.target.checked)} />
-            Apagar também todos os dados (não tem volta)
-          </label>
+          <p className="notice">
+            Para guardar uma cópia, gere um backup antes. Para só tirar do ar, use
+            Suspender.
+          </p>
           <label className="field">
             <span>{`Para confirmar, digite ${tenant.slug}`}</span>
             <input className="input" value={typed} onChange={event => setTyped(event.target.value)} />

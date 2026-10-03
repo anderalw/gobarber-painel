@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
-  "description": "Painel do SaaS Pontual: cria, sobe e acompanha o ambiente de cada barbearia",
+  "description": "Painel do SaaS Pontual: cadastra, cobra e acompanha as barbearias",
   "scripts": {
     "dev": "concurrently -k -n api,web -c yellow,cyan \"tsx watch server/src/index.ts\" \"vite --config web/vite.config.ts\"",
     "build": "tsc -p server --noEmit && tsc -p web --noEmit && vite build --config web/vite.config.ts",

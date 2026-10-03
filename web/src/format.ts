@@ -1,7 +1,7 @@
 import { addDays, format, formatDistanceToNow, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
-import type { Runtime, Status, TenantView } from './api';
+import type { Status, TenantView } from './api';
 
 export const money = (cents: number): string =>
   (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -27,31 +27,17 @@ export const ago = (iso: string): string =>
 export type Tone = 'success' | 'warning' | 'danger' | 'neutral' | 'primary';
 
 // Situação do sistema da barbearia (o que o cliente dela vê)
-export function situation(tenant: Pick<TenantView, 'status' | 'runtime' | 'busy' | 'last_operation'>): {
+export function situation(tenant: Pick<TenantView, 'status'>): {
   label: string;
   tone: Tone;
 } {
-  if (tenant.busy) {
-    return { label: `${tenant.last_operation || 'Em andamento'}...`, tone: 'primary' };
-  }
-
-  const byStatus: Partial<Record<Status, { label: string; tone: Tone }>> = {
-    provisioning: { label: 'Preparando', tone: 'primary' },
+  const byStatus: Record<Status, { label: string; tone: Tone }> = {
+    active: { label: 'No ar', tone: 'success' },
     suspended: { label: 'Suspensa', tone: 'neutral' },
-    error: { label: 'Falhou ao criar', tone: 'danger' },
+    legacy: { label: 'Modelo antigo', tone: 'warning' },
   };
 
-  if (byStatus[tenant.status]) return byStatus[tenant.status] as { label: string; tone: Tone };
-
-  const byRuntime: Record<Runtime, { label: string; tone: Tone }> = {
-    online: { label: 'No ar', tone: 'success' },
-    starting: { label: 'Iniciando', tone: 'primary' },
-    partial: { label: 'Com problema', tone: 'danger' },
-    stopped: { label: 'Parada', tone: 'danger' },
-    absent: { label: 'Sem ambiente', tone: 'danger' },
-  };
-
-  return byRuntime[tenant.runtime];
+  return byStatus[tenant.status];
 }
 
 export function billingLabel(tenant: Pick<TenantView, 'billing'>): {
@@ -73,17 +59,6 @@ export function billingLabel(tenant: Pick<TenantView, 'billing'>): {
 
   return { label: 'Em dia', tone: 'success' };
 }
-
-export const TIMEZONES = [
-  { value: 'America/Sao_Paulo', label: 'Brasília (SP, RJ, MG, Sul, NE...)' },
-  { value: 'America/Manaus', label: 'Amazonas (Manaus)' },
-  { value: 'America/Cuiaba', label: 'Mato Grosso (Cuiabá)' },
-  { value: 'America/Campo_Grande', label: 'Mato Grosso do Sul' },
-  { value: 'America/Porto_Velho', label: 'Rondônia' },
-  { value: 'America/Boa_Vista', label: 'Roraima' },
-  { value: 'America/Rio_Branco', label: 'Acre' },
-  { value: 'America/Noronha', label: 'Fernando de Noronha' },
-];
 
 export const METHODS: Record<string, string> = {
   pix: 'Pix',

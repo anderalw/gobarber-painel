@@ -5,7 +5,6 @@ import { fileURLToPath } from 'url';
 import express, { NextFunction, Request, Response } from 'express';
 
 import { config } from './config';
-import { ensureNetwork } from './docker';
 import {
   checkLogin,
   clearSessionCookie,
@@ -17,31 +16,28 @@ import {
   PanelError,
   backupFile,
   backupTenant,
-  cleanOldImports,
   listBackups,
-  receiveImport,
   createTenant,
   details,
   editTenant,
   findTenant,
+  importTenant,
   initialPassword,
   overview,
-  recoverInterrupted,
   refreshAllMetrics,
   refreshMetrics,
   registerPayment,
   removeTenant,
-  reprovision,
   resume,
+  setDomain,
   suspend,
-  syncCaddy,
-  upgrade,
+  syncWithApi,
 } from './tenants';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist = path.resolve(here, '..', '..', 'web', 'dist');
 
-// Uso de cada barbearia: atualiza de tempos em tempos
+// Uso de cada barbearia e a lista da API: atualiza de tempos em tempos
 const METRICS_INTERVAL_MS = 15 * 60 * 1000;
 
 const app = express();
@@ -96,42 +92,55 @@ api.get('/me', (request, response) => {
   response.json({
     email: config.panelEmail,
     base_domain: config.baseDomain,
-    tls: config.tls,
-    public_port: config.publicHttpPort,
-    api_image: config.apiImage,
-    web_image: config.webImage,
   });
 });
 
 api.use(requireAuth);
 
-// Backup para importar: o arquivo vem cru no corpo (até 2 GB)
-api.post(
-  '/imports',
-  handle(async (request, response) =>
-    response.status(201).json(await receiveImport(request, 2 * 1024 * 1024 * 1024)),
-  ),
+api.get(
+  '/overview',
+  handle(async (request, response) => {
+    // Pega o que mudou na API (sem ela, mostra o que o painel já sabe)
+    await syncWithApi().catch(() => undefined);
+
+    return response.json(overview());
+  }),
 );
 
-api.get('/overview', handle(async (request, response) => response.json(await overview())));
+// Nova barbearia a partir de um backup: o arquivo vem cru no corpo e vai
+// direto para a API; a cobrança vem na query
+api.post(
+  '/tenants/import',
+  handle(async (request, response) => {
+    const query = request.query as Record<string, string | undefined>;
+
+    return response.status(201).json(
+      await importTenant(request, {
+        name: query.name,
+        slug: query.slug,
+        monthly_price_cents: Number(query.monthly_price_cents),
+        trial_days: Number(query.trial_days ?? 7),
+        notes: query.notes || null,
+      }),
+    );
+  }),
+);
 
 api.post(
   '/tenants',
-  handle((request, response) => {
+  handle(async (request, response) => {
     const body = request.body || {};
 
     return response.status(201).json(
-      createTenant({
+      await createTenant({
         name: String(body.name || ''),
         slug: body.slug ? String(body.slug) : undefined,
-        domain: body.domain ? String(body.domain) : undefined,
+        custom_domain: body.custom_domain ? String(body.custom_domain) : null,
         admin_name: String(body.admin_name || ''),
         admin_email: String(body.admin_email || ''),
-        timezone: String(body.timezone || 'America/Sao_Paulo'),
         monthly_price_cents: Number(body.monthly_price_cents),
         trial_days: Number(body.trial_days ?? 7),
         notes: body.notes ? String(body.notes) : null,
-        import_id: body.import_id ? String(body.import_id) : null,
       }),
     );
   }),
@@ -139,7 +148,7 @@ api.post(
 
 api.get(
   '/tenants/:id',
-  handle(async (request, response) => response.json(await details(request.params.id))),
+  handle((request, response) => response.json(details(request.params.id))),
 );
 
 api.put(
@@ -147,29 +156,39 @@ api.put(
   handle(async (request, response) => {
     const body = request.body || {};
 
-    editTenant(request.params.id, {
+    await editTenant(request.params.id, {
       name: String(body.name || ''),
       monthly_price_cents: Number(body.monthly_price_cents),
       notes: body.notes ? String(body.notes) : null,
     });
 
-    return response.json(await details(request.params.id));
+    return response.json(details(request.params.id));
   }),
 );
 
-const actions: Record<string, (id: string) => void> = {
+const actions: Record<string, (id: string) => Promise<void>> = {
   suspend,
   resume,
-  upgrade,
-  retry: reprovision,
 };
 
 api.post(
-  '/tenants/:id/:action(suspend|resume|upgrade|retry)',
+  '/tenants/:id/:action(suspend|resume)',
   handle(async (request, response) => {
-    actions[request.params.action](request.params.id);
+    await actions[request.params.action](request.params.id);
 
-    return response.status(202).json(await details(request.params.id));
+    return response.json(details(request.params.id));
+  }),
+);
+
+// Domínio próprio da barbearia (vazio: só o subdomínio)
+api.put(
+  '/tenants/:id/domain',
+  handle(async (request, response) => {
+    const domain = request.body?.custom_domain;
+
+    await setDomain(request.params.id, domain ? String(domain) : null);
+
+    return response.json(details(request.params.id));
   }),
 );
 
@@ -178,7 +197,7 @@ api.post(
   handle(async (request, response) => {
     await refreshMetrics(findTenant(request.params.id));
 
-    return response.json(await details(request.params.id));
+    return response.json(details(request.params.id));
   }),
 );
 
@@ -196,16 +215,16 @@ api.post(
       note: body.note ? String(body.note) : null,
     });
 
-    return response.status(201).json(await details(request.params.id));
+    return response.status(201).json(details(request.params.id));
   }),
 );
 
 api.post(
   '/tenants/:id/backup',
   handle(async (request, response) => {
-    backupTenant(request.params.id);
+    const name = await backupTenant(request.params.id);
 
-    return response.status(202).json(await details(request.params.id));
+    return response.status(201).json({ name });
   }),
 );
 
@@ -231,7 +250,7 @@ api.get(
 api.delete(
   '/tenants/:id',
   handle(async (request, response) => {
-    await removeTenant(request.params.id, request.query.purge === '1');
+    await removeTenant(request.params.id);
 
     return response.status(204).send();
   }),
@@ -258,13 +277,9 @@ app.use((err: unknown, request: Request, response: Response, _next: NextFunction
 });
 
 async function start(): Promise<void> {
-  recoverInterrupted();
-  cleanOldImports();
-  await ensureNetwork(config.edgeNetwork);
-
-  // Aplica os endereços no Caddy (se ele ainda não subiu, tenta de novo depois)
-  await syncCaddy().catch(err =>
-    console.warn(`Caddy ainda indisponível: ${err.message}`),
+  // Confere a lista com a API (se ela ainda não subiu, tenta de novo depois)
+  await syncWithApi().catch(err =>
+    console.warn(`API do Pontual ainda indisponível: ${err.message}`),
   );
 
   app.listen(config.port, () => {
@@ -272,8 +287,9 @@ async function start(): Promise<void> {
   });
 
   setInterval(() => {
-    refreshAllMetrics().catch(() => undefined);
-    syncCaddy().catch(() => undefined);
+    syncWithApi()
+      .then(refreshAllMetrics)
+      .catch(() => undefined);
   }, METRICS_INTERVAL_MS);
 }
 
