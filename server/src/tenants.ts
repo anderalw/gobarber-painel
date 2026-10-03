@@ -278,7 +278,8 @@ export async function syncWithApi(): Promise<void> {
     });
   });
 
-  known
+  // Lido de novo: as ligadas agora pelo identificador já têm o id novo
+  listTenants()
     .filter(tenant => tenant.api_id && !apiTenants.some(api => api.id === tenant.api_id))
     .forEach(tenant => update(tenant.id, { api_id: null, status: 'legacy' }));
 }
