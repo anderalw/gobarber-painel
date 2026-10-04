@@ -95,6 +95,8 @@ async function json<T>(
 export interface Segment {
   key: string;
   name: string;
+  // Serviços de exemplo com que o negócio começa
+  samples?: string[];
 }
 
 export const pontual = {

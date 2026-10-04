@@ -52,8 +52,12 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
   // Começar vazia ou a partir de um backup (uma barbearia que já existe)
   const [mode, setMode] = useState<'new' | 'import'>('new');
   // Ramo do negócio (define os termos e os padrões); não muda depois
-  const [segments, setSegments] = useState<Array<{ key: string; name: string }>>([]);
+  const [segments, setSegments] = useState<
+    Array<{ key: string; name: string; samples?: string[] }>
+  >([]);
   const [segment, setSegment] = useState('barbershop');
+  // Serviços de exemplo do ramo escolhido
+  const samples = segments.find(item => item.key === segment)?.samples || [];
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -75,7 +79,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
   }, [mode]);
 
   useEffect(() => {
-    api<Array<{ key: string; name: string }>>('/segments')
+    api<Array<{ key: string; name: string; samples?: string[] }>>('/segments')
       .then(setSegments)
       .catch(() => setSegments([{ key: 'barbershop', name: 'Barbearia' }]));
   }, []);
@@ -250,7 +254,12 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                       </option>
                     ))}
                   </select>
-                  <small>Define os termos e os padrões. Não muda depois.</small>
+                  <small>
+                    Define os termos e os padrões. Não muda depois.
+                    {mode === 'new' &&
+                      samples.length > 0 &&
+                      ` Começa com: ${samples.join(', ')} (dá para mudar).`}
+                  </small>
                 </label>
                 <label className="field">
                   <span>{mode === 'import' ? 'Nome (vazio = o do backup)' : 'Nome do negócio'}</span>
