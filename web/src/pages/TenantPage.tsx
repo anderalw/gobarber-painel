@@ -276,7 +276,7 @@ export default function TenantPage() {
                 <dd>{metrics ? metrics.clients : '–'}</dd>
               </div>
               <div>
-                <dt>Assinantes do clube</dt>
+                <dt>Assinantes</dt>
                 <dd>{metrics ? metrics.active_members : '–'}</dd>
               </div>
             </dl>
@@ -340,7 +340,7 @@ export default function TenantPage() {
             {!tenant.has_initial_password ? (
               <p className="notice">
                 {tenant.origin === 'import'
-                  ? 'Importada de um backup: todos entram com os mesmos logins e senhas de antes.'
+                  ? 'Importado de um backup: todos entram com os mesmos logins e senhas de antes.'
                   : 'Já existia na instalação: os logins são os que o negócio já usava.'}
               </p>
             ) : (

@@ -35,7 +35,7 @@ export default function Dashboard({ me }: { me: Me }) {
       <div className="page-header">
         <div>
           <h1>Negócios</h1>
-          <p>Todas na mesma instalação, cada uma com os próprios dados e endereço.</p>
+          <p>Todos na mesma instalação, cada um com os próprios dados e endereço.</p>
         </div>
         <div>
           <button type="button" className="btn" onClick={() => setCreating(true)}>
@@ -62,7 +62,7 @@ export default function Dashboard({ me }: { me: Me }) {
           <strong>{summary ? summary.late : '–'}</strong>
         </div>
         <div className="kpi">
-          <span>Suspensas</span>
+          <span>Suspensos</span>
           <strong>{summary ? summary.suspended : '–'}</strong>
         </div>
       </div>

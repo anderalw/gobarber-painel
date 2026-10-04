@@ -158,7 +158,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
           <p>
             {created
               ? 'Já está no ar. Entregue o acesso abaixo ao cliente.'
-              : 'Ela entra na instalação do Pontual com os próprios dados e endereço.'}
+              : 'Ele entra na instalação do Pontual com os próprios dados e endereço.'}
           </p>
         </header>
 
@@ -197,7 +197,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                 </div>
               ) : (
                 <p className="notice">
-                  Importada de um backup: agenda, clientes, clube e configurações vêm junto, e
+                  Importado de um backup: agenda, clientes, assinaturas e configurações vêm junto, e
                   todos entram com os mesmos logins e senhas de antes.
                 </p>
               )}
