@@ -67,3 +67,16 @@ export const METHODS: Record<string, string> = {
   transferencia: 'Transferência',
   dinheiro: 'Dinheiro',
 };
+
+// Nome de cada ramo de negócio (os mesmos da API)
+export const SEGMENT_NAMES: Record<string, string> = {
+  barbershop: 'Barbearia',
+  beauty: 'Salão de beleza / estética',
+  tattoo: 'Estúdio de tatuagem',
+  physio: 'Fisioterapia',
+  clinic: 'Consultório',
+};
+
+export function segmentName(key?: string): string {
+  return SEGMENT_NAMES[key || 'barbershop'] || key || 'Barbearia';
+}

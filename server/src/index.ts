@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import express, { NextFunction, Request, Response } from 'express';
 
 import { config } from './config';
+import { pontual } from './pontual';
 import {
   checkLogin,
   clearSessionCookie,
@@ -109,6 +110,12 @@ api.get(
 
 // Nova barbearia a partir de um backup: o arquivo vem cru no corpo e vai
 // direto para a API; a cobrança vem na query
+// Ramos de negócio para escolher ao criar
+api.get(
+  '/segments',
+  handle(async (request, response) => response.json(await pontual.segments())),
+);
+
 api.post(
   '/tenants/import',
   handle(async (request, response) => {
@@ -118,6 +125,7 @@ api.post(
       await importTenant(request, {
         name: query.name,
         slug: query.slug,
+        segment: query.segment || undefined,
         monthly_price_cents: Number(query.monthly_price_cents),
         trial_days: Number(query.trial_days ?? 7),
         notes: query.notes || null,
@@ -138,6 +146,7 @@ api.post(
         custom_domain: body.custom_domain ? String(body.custom_domain) : null,
         admin_name: String(body.admin_name || ''),
         admin_email: String(body.admin_email || ''),
+        segment: body.segment ? String(body.segment) : undefined,
         monthly_price_cents: Number(body.monthly_price_cents),
         trial_days: Number(body.trial_days ?? 7),
         notes: body.notes ? String(body.notes) : null,

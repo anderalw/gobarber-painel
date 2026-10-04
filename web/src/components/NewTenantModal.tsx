@@ -51,6 +51,9 @@ async function upload(file: File, query: Record<string, string>): Promise<Tenant
 export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props) {
   // Começar vazia ou a partir de um backup (uma barbearia que já existe)
   const [mode, setMode] = useState<'new' | 'import'>('new');
+  // Ramo do negócio (define os termos e os padrões); não muda depois
+  const [segments, setSegments] = useState<Array<{ key: string; name: string }>>([]);
+  const [segment, setSegment] = useState('barbershop');
   const [file, setFile] = useState<File | null>(null);
   const [name, setName] = useState('');
   const [slug, setSlug] = useState('');
@@ -65,6 +68,17 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
   const [created, setCreated] = useState<Created | null>(null);
 
   const finalSlug = slugTouched ? slug : slugify(name);
+
+  // No backup, o ramo vem dele (a não ser que escolha outro)
+  useEffect(() => {
+    setSegment(mode === 'import' ? 'backup' : 'barbershop');
+  }, [mode]);
+
+  useEffect(() => {
+    api<Array<{ key: string; name: string }>>('/segments')
+      .then(setSegments)
+      .catch(() => setSegments([{ key: 'barbershop', name: 'Barbearia' }]));
+  }, []);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -99,6 +113,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
         const tenant = await upload(file, {
           name: name.trim(),
           slug: finalSlug,
+          segment: segment === 'backup' ? '' : segment,
           monthly_price_cents: String(cents),
           trial_days: String(Number(trial || 0)),
         });
@@ -112,6 +127,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
               name,
               slug: finalSlug,
               custom_domain: domain.trim() || null,
+              segment,
               admin_name: adminName,
               admin_email: adminEmail,
               monthly_price_cents: cents,
@@ -136,9 +152,9 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
         if (event.target === event.currentTarget && !saving) onClose();
       }}
     >
-      <div className="modal" role="dialog" aria-modal="true" style={{ height: 'min(660px, 100%)' }}>
+      <div className="modal" role="dialog" aria-modal="true" style={{ height: 'min(740px, 100%)' }}>
         <header>
-          <h2>{created ? 'Barbearia criada' : 'Nova barbearia'}</h2>
+          <h2>{created ? 'Negócio criado' : 'Novo negócio'}</h2>
           <p>
             {created
               ? 'Já está no ar. Entregue o acesso abaixo ao cliente.'
@@ -157,7 +173,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                   </a>
                 </dd>
                 <dt>Entrar em</dt>
-                <dd>{`${created.tenant.url}/barbeiro`}</dd>
+                <dd>{`${created.tenant.url}/equipe`}</dd>
                 <dt>Administrador</dt>
                 <dd>{created.tenant.admin_email || '–'}</dd>
               </dl>
@@ -176,7 +192,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                   </div>
                   <small>
                     Peça para o cliente trocar no primeiro acesso (Meu perfil). Ela também fica
-                    na página da barbearia.
+                    na página do negócio.
                   </small>
                 </div>
               ) : (
@@ -191,7 +207,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                 Fechar
               </button>
               <button type="button" className="btn" onClick={() => onOpen(created.tenant.id)}>
-                Abrir barbearia
+                Abrir negócio
               </button>
             </footer>
           </>
@@ -219,17 +235,35 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                 </button>
               </div>
 
-              <label className="field">
-                <span>{mode === 'import' ? 'Nome (vazio = o do backup)' : 'Nome da barbearia'}</span>
-                <input
-                  className="input"
-                  autoFocus
-                  value={name}
-                  maxLength={80}
-                  placeholder="Ex.: Barbearia do Zé"
-                  onChange={event => setName(event.target.value)}
-                />
-              </label>
+              <div className="row">
+                <label className="field">
+                  <span>Ramo do negócio</span>
+                  <select
+                    className="input"
+                    value={segment}
+                    onChange={event => setSegment(event.target.value)}
+                  >
+                    {mode === 'import' && <option value="backup">O do backup</option>}
+                    {segments.map(item => (
+                      <option key={item.key} value={item.key}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                  <small>Define os termos e os padrões. Não muda depois.</small>
+                </label>
+                <label className="field">
+                  <span>{mode === 'import' ? 'Nome (vazio = o do backup)' : 'Nome do negócio'}</span>
+                  <input
+                    className="input"
+                    autoFocus
+                    value={name}
+                    maxLength={80}
+                    placeholder="Ex.: Studio do Zé"
+                    onChange={event => setName(event.target.value)}
+                  />
+                </label>
+              </div>
 
               <div className="row">
                 <label className="field">
@@ -252,7 +286,7 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                     <input
                       className="input"
                       value={domain}
-                      placeholder="barbeariadoze.com.br"
+                      placeholder="studiodoze.com.br"
                       onChange={event => setDomain(event.target.value)}
                     />
                     <small>Dá para configurar depois.</small>
@@ -336,8 +370,8 @@ export default function NewTenantModal({ me, onClose, onCreated, onOpen }: Props
                     ? 'Importando...'
                     : 'Criando...'
                   : mode === 'import'
-                    ? 'Importar barbearia'
-                    : 'Criar barbearia'}
+                    ? 'Importar negócio'
+                    : 'Criar negócio'}
               </button>
             </footer>
           </form>

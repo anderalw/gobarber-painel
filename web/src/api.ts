@@ -52,6 +52,8 @@ export interface TenantView {
   id: string;
   slug: string;
   name: string;
+  // Ramo de negócio (barbershop, tattoo...)
+  segment: string;
   // Endereço principal (o domínio próprio ou o subdomínio)
   domain: string;
   custom_domain: string | null;

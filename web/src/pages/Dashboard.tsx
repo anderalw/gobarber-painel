@@ -2,7 +2,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api, Me, Overview } from '../api';
-import { billingLabel, lastPaidDay, money, situation } from '../format';
+import { billingLabel, lastPaidDay, money, segmentName, situation } from '../format';
 import NewTenantModal from '../components/NewTenantModal';
 
 export default function Dashboard({ me }: { me: Me }) {
@@ -34,19 +34,19 @@ export default function Dashboard({ me }: { me: Me }) {
     <div className="page">
       <div className="page-header">
         <div>
-          <h1>Barbearias</h1>
+          <h1>Negócios</h1>
           <p>Todas na mesma instalação, cada uma com os próprios dados e endereço.</p>
         </div>
         <div>
           <button type="button" className="btn" onClick={() => setCreating(true)}>
-            + Nova barbearia
+            + Novo negócio
           </button>
         </div>
       </div>
 
       <div className="kpis">
         <div className="kpi">
-          <span>Barbearias</span>
+          <span>Negócios</span>
           <strong>{summary ? summary.total : '–'}</strong>
         </div>
         <div className="kpi">
@@ -76,13 +76,13 @@ export default function Dashboard({ me }: { me: Me }) {
       <div className="card">
         {data && data.tenants.length === 0 ? (
           <div className="empty">
-            Nenhuma barbearia ainda. Crie a primeira em &quot;Nova barbearia&quot;.
+            Nenhum negócio ainda. Crie o primeiro em &quot;Novo negócio&quot;.
           </div>
         ) : (
           <table>
             <thead>
               <tr>
-                <th>Barbearia</th>
+                <th>Negócio</th>
                 <th>Sistema</th>
                 <th>Mensalidade</th>
                 <th className="num">Agendamentos (30 dias)</th>
@@ -98,11 +98,11 @@ export default function Dashboard({ me }: { me: Me }) {
                   <tr
                     key={tenant.id}
                     className="clickable"
-                    onClick={() => navigate(`/barbearias/${tenant.id}`)}
+                    onClick={() => navigate(`/negocios/${tenant.id}`)}
                   >
                     <td>
                       <strong>{tenant.name}</strong>
-                      <small>{tenant.domain}</small>
+                      <small>{`${segmentName(tenant.segment)} · ${tenant.domain}`}</small>
                     </td>
                     <td>
                       <span className={`badge ${state.tone}`}>
@@ -135,7 +135,7 @@ export default function Dashboard({ me }: { me: Me }) {
           me={me}
           onClose={() => setCreating(false)}
           onCreated={() => load()}
-          onOpen={id => navigate(`/barbearias/${id}`)}
+          onOpen={id => navigate(`/negocios/${id}`)}
         />
       )}
     </div>

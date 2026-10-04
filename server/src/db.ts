@@ -32,6 +32,8 @@ export interface Tenant {
   // 'new': criada vazia; 'import': a partir de um backup; 'found': já
   // existia na API (ex.: a barbearia da instalação de antes)
   origin: 'new' | 'import' | 'found';
+  // Ramo de negócio (vem da API)
+  segment: string;
   created_at: string;
   updated_at: string;
 }
@@ -99,6 +101,7 @@ const added: Record<string, string> = {
   api_id: 'TEXT',
   custom_domain: 'TEXT',
   initial_password: 'TEXT',
+  segment: "TEXT NOT NULL DEFAULT 'barbershop'",
 };
 
 Object.entries(added).forEach(([name, definition]) => {

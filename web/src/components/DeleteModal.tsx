@@ -53,12 +53,12 @@ export default function DeleteModal({ tenant, onClose, onDeleted }: Props) {
         style={{ height: 'min(460px, 100%)', maxWidth: 500 }}
       >
         <header>
-          <h2>Excluir barbearia</h2>
+          <h2>Excluir negócio</h2>
           <p>{`${tenant.name} (${tenant.domain})`}</p>
         </header>
         <div className="modal-body stack">
           <p>
-            O sistema sai do ar e todos os dados da barbearia são apagados: agenda,
+            O sistema sai do ar e todos os dados do negócio são apagados: agenda,
             clientes, clube, caixa e fotos. Não tem volta.
           </p>
           <p className="notice">

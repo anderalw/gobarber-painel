@@ -31,7 +31,7 @@ export default function Login({ onLogged }: { onLogged(): void }) {
             Pontual <small>· Painel</small>
           </span>
           <h1>Entrar no painel</h1>
-          <p className="muted">Controle das barbearias do SaaS.</p>
+          <p className="muted">Controle dos negócios do SaaS.</p>
         </div>
 
         <label className="field">

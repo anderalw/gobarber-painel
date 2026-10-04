@@ -3,7 +3,7 @@ import { Readable } from 'stream';
 import { config } from './config';
 
 // Cliente das rotas da plataforma na API do Pontual (/internal). É lá que
-// as barbearias existem; o painel guarda a cobrança e as anotações
+// os negócios existem; o painel guarda a cobrança e as anotações
 
 export class PontualError extends Error {
   constructor(
@@ -20,6 +20,8 @@ export interface ApiTenant {
   name: string;
   custom_domain: string | null;
   status: 'active' | 'suspended';
+  // Ramo de negócio (barbershop, tattoo, physio...)
+  segment?: string;
   host: string;
   created_at: string;
   admin?: { name: string; email: string } | null;
@@ -90,7 +92,14 @@ async function json<T>(
   return (response.status === 204 ? undefined : await response.json()) as T;
 }
 
+export interface Segment {
+  key: string;
+  name: string;
+}
+
 export const pontual = {
+  segments: () => json<Segment[]>('/segments'),
+
   list: () => json<ApiTenant[]>('/tenants'),
 
   show: (id: string) => json<ApiTenant>(`/tenants/${id}`),
@@ -99,6 +108,7 @@ export const pontual = {
     slug: string;
     name: string;
     custom_domain?: string | null;
+    segment?: string;
     admin: { name: string; email: string; password: string };
   }) => json<ApiTenant>('/tenants', { method: 'POST', body: data }),
 
@@ -120,7 +130,10 @@ export const pontual = {
     return response.body;
   },
 
-  import: (archive: Readable | Buffer, options: { slug?: string; name?: string }) =>
+  import: (
+    archive: Readable | Buffer,
+    options: { slug?: string; name?: string; segment?: string },
+  ) =>
     json<ApiTenant>('/tenants/import', {
       method: 'POST',
       raw: archive,

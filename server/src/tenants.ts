@@ -54,7 +54,7 @@ export function findTenant(id: string): Tenant {
     | Tenant
     | undefined;
 
-  if (!tenant) throw new PanelError('Barbearia não encontrada.', 404);
+  if (!tenant) throw new PanelError('Negócio não encontrado.', 404);
 
   return tenant;
 }
@@ -86,7 +86,7 @@ function update(id: string, values: Partial<Tenant>): void {
 function linked(tenant: Tenant): string {
   if (!tenant.api_id) {
     throw new PanelError(
-      'Barbearia do modelo antigo (contêineres separados): importe o backup dela para usar.',
+      'Negócio do modelo antigo (contêineres separados): importe o backup dele para usar.',
     );
   }
 
@@ -111,6 +111,7 @@ export function view(tenant: Tenant) {
     billing: billingState(tenant.paid_until, new Date()),
     status: tenant.status,
     origin: tenant.origin,
+    segment: tenant.segment || 'barbershop',
     has_initial_password: !!tenant.initial_password,
     notes: tenant.notes,
     metrics: tenant.metrics_json ? JSON.parse(tenant.metrics_json) : null,
@@ -182,6 +183,7 @@ function fromApi(api: ApiTenant): Partial<Tenant> {
     domain: api.host,
     custom_domain: api.custom_domain,
     status: api.status,
+    segment: api.segment || 'barbershop',
   };
 }
 
@@ -245,11 +247,13 @@ function remember(
     metrics_json: null,
     metrics_at: null,
     origin: values.origin,
+    segment: api.segment || 'barbershop',
     created_at: now.toISOString(),
     updated_at: now.toISOString(),
   };
 
   insert(tenant);
+  update(tenant.id, { segment: tenant.segment });
 
   return tenant;
 }
@@ -292,6 +296,7 @@ export interface CreateTenant extends Billing {
   custom_domain?: string | null;
   admin_name: string;
   admin_email: string;
+  segment?: string;
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
@@ -303,8 +308,8 @@ export async function createTenant(data: CreateTenant): Promise<{
   const name = data.name.trim();
   const slug = slugify(data.slug || name);
 
-  if (!name) throw new PanelError('Informe o nome da barbearia.');
-  if (!slug) throw new PanelError('Informe um identificador (ex.: barbearia-do-ze).');
+  if (!name) throw new PanelError('Informe o nome do negócio.');
+  if (!slug) throw new PanelError('Informe um identificador (ex.: studio-do-ze).');
   if (!data.admin_name.trim()) throw new PanelError('Informe o nome do administrador.');
   if (!EMAIL.test(data.admin_email.trim())) {
     throw new PanelError('E-mail do administrador inválido.');
@@ -314,7 +319,7 @@ export async function createTenant(data: CreateTenant): Promise<{
 
   const legacy = db.prepare("SELECT 1 FROM tenants WHERE slug = ? AND status != 'legacy'").get(slug);
 
-  if (legacy) throw new PanelError(`Já existe uma barbearia com o identificador "${slug}".`);
+  if (legacy) throw new PanelError(`Já existe um negócio com o identificador "${slug}".`);
 
   const password = readablePassword();
   const admin = {
@@ -328,6 +333,7 @@ export async function createTenant(data: CreateTenant): Promise<{
       slug,
       name,
       custom_domain: data.custom_domain?.trim() || null,
+      segment: data.segment || undefined,
       admin,
     }),
   );
@@ -347,12 +353,12 @@ export async function createTenant(data: CreateTenant): Promise<{
 // Backup enviado pela tela (o corpo cru), direto para a API
 export async function importTenant(
   body: Readable,
-  data: Billing & { name?: string; slug?: string },
+  data: Billing & { name?: string; slug?: string; segment?: string },
 ): Promise<ReturnType<typeof view>> {
   validBilling(data);
 
   const slug = data.slug ? slugify(data.slug) : undefined;
-  const created = await guard(() => pontual.import(body, { slug, name: data.name?.trim() }));
+  const created = await guard(() => pontual.import(body, { slug, name: data.name?.trim(), segment: data.segment }));
   const api = await guard(() => pontual.show(created.id));
 
   const tenant = remember(api, {
@@ -370,7 +376,7 @@ export async function suspend(id: string): Promise<void> {
   const tenant = findTenant(id);
 
   if (tenant.status !== 'active') {
-    throw new PanelError('Só barbearias no ar podem ser suspensas.');
+    throw new PanelError('Só negócios no ar podem ser suspensos.');
   }
 
   const api = await guard(() => pontual.update(linked(tenant), { status: 'suspended' }));
@@ -382,7 +388,7 @@ export async function resume(id: string): Promise<void> {
   const tenant = findTenant(id);
 
   if (tenant.status !== 'suspended') {
-    throw new PanelError('Esta barbearia não está suspensa.');
+    throw new PanelError('Este negócio não está suspenso.');
   }
 
   const api = await guard(() => pontual.update(linked(tenant), { status: 'active' }));
@@ -422,7 +428,7 @@ export async function editTenant(
 ): Promise<void> {
   const tenant = findTenant(id);
 
-  if (!data.name.trim()) throw new PanelError('Informe o nome da barbearia.');
+  if (!data.name.trim()) throw new PanelError('Informe o nome do negócio.');
   if (!Number.isInteger(data.monthly_price_cents) || data.monthly_price_cents < 0) {
     throw new PanelError('Mensalidade inválida.');
   }

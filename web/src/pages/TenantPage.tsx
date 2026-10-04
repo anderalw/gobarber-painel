@@ -10,6 +10,7 @@ import {
   lastPaidDay,
   money,
   parseMoney,
+  segmentName,
   situation,
 } from '../format';
 import PaymentModal from '../components/PaymentModal';
@@ -29,7 +30,7 @@ const size = (bytes: number): string =>
     : `${Math.max(1, Math.round(bytes / 1024))} KB`;
 
 const CONFIRM: Partial<Record<Action, string>> = {
-  suspend: 'Suspender? O sistema da barbearia sai do ar (os dados ficam guardados).',
+  suspend: 'Suspender? O sistema do negócio sai do ar (os dados ficam guardados).',
 };
 
 export default function TenantPage() {
@@ -172,7 +173,7 @@ export default function TenantPage() {
     return (
       <div className="page">
         <Link to="/" className="back">
-          ← Barbearias
+          ← Negócios
         </Link>
         <p className="muted">{error || 'Carregando...'}</p>
       </div>
@@ -186,7 +187,7 @@ export default function TenantPage() {
   return (
     <div className="page">
       <Link to="/" className="back">
-        ← Barbearias
+        ← Negócios
       </Link>
 
       <div className="page-header">
@@ -201,7 +202,7 @@ export default function TenantPage() {
             <a href={tenant.url} target="_blank" rel="noreferrer">
               {tenant.url}
             </a>
-            {` · desde ${day(tenant.created_at)}`}
+            {` · ${segmentName(tenant.segment)} · desde ${day(tenant.created_at)}`}
           </p>
         </div>
         <div>
@@ -223,9 +224,9 @@ export default function TenantPage() {
 
       {legacy && (
         <p className="notice" style={{ marginBottom: 12 }}>
-          Esta barbearia é do modelo antigo, com contêineres próprios, e ainda não está na
+          Este negócio é do modelo antigo, com contêineres próprios, e ainda não está na
           instalação compartilhada. Gere o backup dela (scripts/exportar-backup.mjs) e use
-          Nova barbearia → Importar de um backup com o mesmo identificador.
+          Novo negócio → Importar de um backup com o mesmo identificador.
         </p>
       )}
 
@@ -267,7 +268,7 @@ export default function TenantPage() {
                 <dd>{metrics ? money(metrics.last_30_days.revenue_cents) : '–'}</dd>
               </div>
               <div>
-                <dt>Barbeiros</dt>
+                <dt>Profissionais</dt>
                 <dd>{metrics ? metrics.providers : '–'}</dd>
               </div>
               <div>
@@ -330,7 +331,7 @@ export default function TenantPage() {
           <div className="card-body stack">
             <dl className="lines">
               <dt>Entrar em</dt>
-              <dd>{`${tenant.url}/barbeiro`}</dd>
+              <dd>{`${tenant.url}/equipe`}</dd>
               <dt>Administrador</dt>
               <dd>
                 {tenant.admin_email ? `${tenant.admin_name} · ${tenant.admin_email}` : '–'}
@@ -340,7 +341,7 @@ export default function TenantPage() {
               <p className="notice">
                 {tenant.origin === 'import'
                   ? 'Importada de um backup: todos entram com os mesmos logins e senhas de antes.'
-                  : 'Já existia na instalação: os logins são os que a barbearia já usava.'}
+                  : 'Já existia na instalação: os logins são os que o negócio já usava.'}
               </p>
             ) : (
             <>
@@ -366,7 +367,7 @@ export default function TenantPage() {
               </button>
             </div>
             <small className="muted">
-              Senha criada com a barbearia. Se o cliente já trocou, ela não vale mais.
+              Senha criada com o negócio. Se o cliente já trocou, ela não vale mais.
             </small>
             </>
             )}
@@ -426,7 +427,7 @@ export default function TenantPage() {
               <input
                 className="input"
                 value={domain}
-                placeholder="barbeariadoze.com.br"
+                placeholder="studiodoze.com.br"
                 disabled={legacy}
                 onChange={event => setDomain(event.target.value)}
               />
@@ -463,7 +464,7 @@ export default function TenantPage() {
         <header>
           <div>
             <h2>Backups</h2>
-            <p>Os dados da barbearia, as fotos e o segredo das integrações. Guarde com cuidado.</p>
+            <p>Os dados do negócio, as fotos e o segredo das integrações. Guarde com cuidado.</p>
           </div>
           <button
             type="button"
@@ -476,8 +477,8 @@ export default function TenantPage() {
         </header>
         {backups.length === 0 ? (
           <p className="empty" style={{ padding: 24 }}>
-            Nenhum backup ainda. Serve para restaurar a barbearia ou mudar de servidor
-            (Nova barbearia → Importar de um backup).
+            Nenhum backup ainda. Serve para restaurar o negócio ou mudar de servidor
+            (Novo negócio → Importar de um backup).
           </p>
         ) : (
           <table>
