@@ -37,6 +37,18 @@ export const config = {
   // Como os links abrem: https://{host} no servidor; no computador, por
   // exemplo, http://{host}:3000 (o Vite) ou http://{host} (o Caddy local)
   siteUrl: env.SITE_URL || 'https://{host}',
+
+  // Página de divulgação do produto (e www.): o domínio principal
+  siteDomain: (env.SITE_DOMAIN || env.BASE_DOMAIN || 'localhost').toLowerCase(),
+
+  // Cadastro pela página: dias de teste, mensalidade depois e se o
+  // negócio é suspenso quando o teste acaba sem pagamento
+  signup: {
+    enabled: env.SIGNUP_ENABLED !== 'false',
+    trialDays: Number(env.SIGNUP_TRIAL_DAYS || 7),
+    priceCents: Number(env.SIGNUP_PRICE_CENTS || 9900),
+    autoSuspend: env.TRIAL_AUTO_SUSPEND !== 'false',
+  },
 };
 
 export type Config = typeof config;

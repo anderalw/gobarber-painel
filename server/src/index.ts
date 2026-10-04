@@ -34,6 +34,7 @@ import {
   suspend,
   syncWithApi,
 } from './tenants';
+import { checkSlug, expireTrials, publicInfo, signup } from './signup';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist = path.resolve(here, '..', '..', 'web', 'dist');
@@ -95,6 +96,41 @@ api.get('/me', (request, response) => {
     base_domain: config.baseDomain,
   });
 });
+
+// --- Página de divulgação (sem login) --------------------------------------
+
+api.get(
+  '/public/info',
+  handle(async (request, response) => response.json(await publicInfo())),
+);
+
+api.get('/public/slug', (request, response) => {
+  response.json(checkSlug(String(request.query.value || '')));
+});
+
+api.post(
+  '/public/signup',
+  handle(async (request, response) => {
+    const body = request.body || {};
+
+    return response.status(201).json(
+      await signup(
+        {
+          business_name: String(body.business_name || ''),
+          segment: String(body.segment || 'barbershop'),
+          slug: String(body.slug || ''),
+          name: String(body.name || ''),
+          email: String(body.email || ''),
+          phone: String(body.phone || ''),
+          password: String(body.password || ''),
+          accepted_terms: body.accepted_terms === true,
+          website: body.website ? String(body.website) : undefined,
+        },
+        request.ip || '',
+      ),
+    );
+  }),
+);
 
 api.use(requireAuth);
 
@@ -270,8 +306,18 @@ app.use('/api', api);
 // Tela (build do Vite); em desenvolvimento quem serve é o próprio Vite
 if (fs.existsSync(webDist)) {
   app.use(express.static(webDist, { index: false, maxAge: '1h' }));
+  const html = fs.readFileSync(path.join(webDist, 'index.html'), 'utf8');
+  // No domínio principal, a página de divulgação (indexável)
+  const siteHtml = html
+    .replace('<html lang="pt-BR">', '<html lang="pt-BR" data-mode="site">')
+    .replace('<meta name="robots" content="noindex" />', '<meta name="description" content="Agenda online, site de agendamento e gestão para barbearias, salões, estúdios e clínicas. Teste grátis." />')
+    .replace('<title>Painel Pontual</title>', '<title>Pontual · Agenda online para o seu negócio</title>');
+  const siteHosts = [config.siteDomain, `www.${config.siteDomain}`];
+
   app.get('*', (request, response) => {
-    response.sendFile(path.join(webDist, 'index.html'));
+    const isSite = siteHosts.includes(request.hostname.toLowerCase());
+
+    response.type('html').send(isSite ? siteHtml : html);
   });
 }
 
@@ -298,6 +344,10 @@ async function start(): Promise<void> {
   setInterval(() => {
     syncWithApi()
       .then(refreshAllMetrics)
+      .then(() => expireTrials())
+      .then(slugs => {
+        if (slugs.length > 0) console.log(`Testes encerrados (suspensos): ${slugs.join(', ')}`);
+      })
       .catch(() => undefined);
   }, METRICS_INTERVAL_MS);
 }

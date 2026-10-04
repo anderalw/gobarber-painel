@@ -106,6 +106,7 @@ export function view(tenant: Tenant) {
     url: publicUrl(tenant.domain),
     admin_name: tenant.admin_name,
     admin_email: tenant.admin_email,
+    admin_phone: tenant.admin_phone || null,
     monthly_price_cents: tenant.monthly_price_cents,
     paid_until: tenant.paid_until,
     billing: billingState(tenant.paid_until, new Date()),
@@ -239,6 +240,7 @@ function remember(
     admin_name: values.admin_name || '',
     admin_email: values.admin_email || '',
     initial_password: values.initial_password || null,
+    admin_phone: values.admin_phone || null,
     timezone: 'America/Sao_Paulo',
     monthly_price_cents: values.monthly_price_cents,
     paid_until: trialUntil(now, values.trial_days),
@@ -253,7 +255,7 @@ function remember(
   };
 
   insert(tenant);
-  update(tenant.id, { segment: tenant.segment });
+  update(tenant.id, { segment: tenant.segment, admin_phone: tenant.admin_phone });
 
   return tenant;
 }
@@ -297,6 +299,10 @@ export interface CreateTenant extends Billing {
   admin_name: string;
   admin_email: string;
   segment?: string;
+  // Cadastro pela página: a senha que a pessoa escolheu (não fica guardada)
+  admin_password?: string;
+  admin_phone?: string | null;
+  origin?: Tenant['origin'];
 }
 
 const EMAIL = /^[^\s@]+@[^\s@]+\.[a-z]{2,}$/i;
@@ -321,7 +327,7 @@ export async function createTenant(data: CreateTenant): Promise<{
 
   if (legacy) throw new PanelError(`Já existe um negócio com o identificador "${slug}".`);
 
-  const password = readablePassword();
+  const password = data.admin_password || readablePassword();
   const admin = {
     name: data.admin_name.trim(),
     email: data.admin_email.trim().toLowerCase(),
@@ -341,10 +347,12 @@ export async function createTenant(data: CreateTenant): Promise<{
   const tenant = remember(api, {
     ...data,
     name,
-    origin: 'new',
+    origin: data.origin || 'new',
     admin_name: admin.name,
     admin_email: admin.email,
-    initial_password: password,
+    admin_phone: data.admin_phone || null,
+    // A senha escolhida pela pessoa não fica no painel
+    initial_password: data.admin_password ? null : password,
   });
 
   return { tenant: view(tenant), admin_password: password };

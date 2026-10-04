@@ -9,6 +9,11 @@ http://{$PANEL_DOMAIN} {
 	reverse_proxy panel:4000
 }
 
+# Página de divulgação e cadastro (domínio principal)
+http://{$SITE_DOMAIN}, http://www.{$SITE_DOMAIN} {
+	reverse_proxy panel:4000
+}
+
 http:// {
 	reverse_proxy web:80
 }

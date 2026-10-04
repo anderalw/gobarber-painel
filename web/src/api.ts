@@ -65,8 +65,10 @@ export interface TenantView {
   paid_until: string;
   billing: { state: 'ok' | 'due' | 'late'; days: number };
   status: Status;
-  // 'import': de um backup (logins de antes); 'found': já estava na API
-  origin: 'new' | 'import' | 'found';
+  // 'import': de um backup (logins de antes); 'found': já estava na API;
+  // 'signup': cadastro pela página de divulgação (teste grátis)
+  origin: 'new' | 'import' | 'found' | 'signup';
+  admin_phone: string | null;
   has_initial_password: boolean;
   notes: string | null;
   metrics: Metrics | null;

@@ -22,6 +22,7 @@ services:
       - '${PUBLIC_HTTPS_PORT:-443}:443'
     environment:
       PANEL_DOMAIN: ${PANEL_DOMAIN:-painel.localhost}
+      SITE_DOMAIN: ${SITE_DOMAIN:-${BASE_DOMAIN:-localhost}}
       ACME_EMAIL: ${ACME_EMAIL:-}
     volumes:
       - ./${CADDYFILE:-Caddyfile}:/etc/caddy/Caddyfile:ro
@@ -121,6 +122,11 @@ services:
       BASE_DOMAIN: ${BASE_DOMAIN}
       SITE_URL: ${TENANT_WEB_URL:-https://{host}}
       DATA_DIR: /data
+      SITE_DOMAIN: ${SITE_DOMAIN:-${BASE_DOMAIN}}
+      SIGNUP_ENABLED: ${SIGNUP_ENABLED:-true}
+      SIGNUP_TRIAL_DAYS: ${SIGNUP_TRIAL_DAYS:-7}
+      SIGNUP_PRICE_CENTS: ${SIGNUP_PRICE_CENTS:-9900}
+      TRIAL_AUTO_SUSPEND: ${TRIAL_AUTO_SUSPEND:-true}
     volumes:
       - panel-data:/data
     depends_on:

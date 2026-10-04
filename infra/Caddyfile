@@ -16,6 +16,11 @@
 	reverse_proxy panel:4000
 }
 
+# Página de divulgação e cadastro (domínio principal)
+{$SITE_DOMAIN}, www.{$SITE_DOMAIN} {
+	reverse_proxy panel:4000
+}
+
 https:// {
 	tls {
 		on_demand

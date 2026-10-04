@@ -30,8 +30,11 @@ export interface Tenant {
   metrics_json: string | null;
   metrics_at: string | null;
   // 'new': criada vazia; 'import': a partir de um backup; 'found': já
-  // existia na API (ex.: a barbearia da instalação de antes)
-  origin: 'new' | 'import' | 'found';
+  // existia na API (ex.: a barbearia da instalação de antes); 'signup':
+  // cadastrada pelo próprio cliente na página de divulgação (em teste)
+  origin: 'new' | 'import' | 'found' | 'signup';
+  // WhatsApp do responsável (cadastro pela página)
+  admin_phone: string | null;
   // Ramo de negócio (vem da API)
   segment: string;
   created_at: string;
@@ -102,6 +105,7 @@ const added: Record<string, string> = {
   custom_domain: 'TEXT',
   initial_password: 'TEXT',
   segment: "TEXT NOT NULL DEFAULT 'barbershop'",
+  admin_phone: 'TEXT',
 };
 
 Object.entries(added).forEach(([name, definition]) => {

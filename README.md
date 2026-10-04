@@ -98,6 +98,25 @@ yarn install
 yarn dev   # painel em http://localhost:4001
 ```
 
+## Página de divulgação e teste grátis
+
+O domínio principal (`SITE_DOMAIN`, ou o `BASE_DOMAIN` se vazio, e o `www.`)
+abre a página de divulgação do Pontual, servida pelo próprio painel:
+
+- o que o sistema faz, para quais ramos, telas de exemplo, preço e dúvidas;
+- **cadastro com teste grátis**: a pessoa escolhe o ramo, o nome, o endereço
+  (`<identificador>.BASE_DOMAIN`), o e-mail e a senha. O negócio nasce no ar na
+  hora, com os serviços de exemplo do ramo, e aparece no painel como
+  "cadastro pela página" (com o WhatsApp do responsável);
+- **fim do teste**: sem pagamento registrado até o fim dos dias grátis, o
+  negócio é suspenso sozinho (os dados ficam). Registrar o pagamento e
+  reativar no painel devolve o acesso.
+
+Ajustes no `.env`: `SIGNUP_ENABLED`, `SIGNUP_TRIAL_DAYS`, `SIGNUP_PRICE_CENTS` e
+`TRIAL_AUTO_SUSPEND`. Contra abuso: limite de cadastros por IP e por hora e um
+campo escondido para robôs. Em desenvolvimento, a página abre em
+`http://localhost:4001/divulgacao`.
+
 ## Backups e importação
 
 **Gerar backup**, na página da barbearia, cria um `.tar.gz` só daquela

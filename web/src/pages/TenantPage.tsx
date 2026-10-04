@@ -336,12 +336,26 @@ export default function TenantPage() {
               <dd>
                 {tenant.admin_email ? `${tenant.admin_name} · ${tenant.admin_email}` : '–'}
               </dd>
+              {tenant.admin_phone && (
+                <>
+                  <dt>WhatsApp</dt>
+                  <dd>
+                    <a href={`https://wa.me/55${tenant.admin_phone.replace(/^55/, '')}`} target="_blank" rel="noreferrer">
+                      {tenant.admin_phone}
+                    </a>
+                  </dd>
+                </>
+              )}
             </dl>
             {!tenant.has_initial_password ? (
               <p className="notice">
-                {tenant.origin === 'import'
-                  ? 'Importado de um backup: todos entram com os mesmos logins e senhas de antes.'
-                  : 'Já existia na instalação: os logins são os que o negócio já usava.'}
+                {tenant.origin === 'import' &&
+                  'Importado de um backup: todos entram com os mesmos logins e senhas de antes.'}
+                {tenant.origin === 'signup' &&
+                  'Cadastrado pela página de divulgação (teste grátis): entra com a senha que escolheu no cadastro.'}
+                {tenant.origin !== 'import' &&
+                  tenant.origin !== 'signup' &&
+                  'Já existia na instalação: os logins são os que o negócio já usava.'}
               </p>
             ) : (
             <>
