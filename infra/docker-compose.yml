@@ -127,6 +127,7 @@ services:
       SIGNUP_TRIAL_DAYS: ${SIGNUP_TRIAL_DAYS:-7}
       SIGNUP_PRICE_CENTS: ${SIGNUP_PRICE_CENTS:-9900}
       TRIAL_AUTO_SUSPEND: ${TRIAL_AUTO_SUSPEND:-true}
+      SUPPORT_WHATSAPP: ${SUPPORT_WHATSAPP:-}
     volumes:
       - panel-data:/data
     depends_on:

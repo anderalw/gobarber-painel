@@ -2,6 +2,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
 import { api, Me, Overview } from '../api';
+
+interface PendingAccount {
+  id: string;
+  name: string;
+  email: string;
+  phone: string;
+  created_at: string;
+}
 import { billingLabel, lastPaidDay, money, segmentName, situation } from '../format';
 import NewTenantModal from '../components/NewTenantModal';
 
@@ -10,6 +18,8 @@ export default function Dashboard({ me }: { me: Me }) {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState('');
   const [creating, setCreating] = useState(false);
+  // Contas da página de divulgação que ainda não criaram o negócio
+  const [pending, setPending] = useState<PendingAccount[]>([]);
 
   const load = useCallback(() => {
     api<Overview>('/overview')
@@ -18,6 +28,9 @@ export default function Dashboard({ me }: { me: Me }) {
         setError('');
       })
       .catch(err => setError(err.message));
+    api<PendingAccount[]>('/accounts/pending')
+      .then(setPending)
+      .catch(() => setPending([]));
   }, []);
 
   useEffect(() => {
@@ -129,6 +142,48 @@ export default function Dashboard({ me }: { me: Me }) {
           </table>
         )}
       </div>
+
+      {pending.length > 0 && (
+        <div className="card" style={{ marginTop: 24 }}>
+          <header>
+            <div>
+              <h2>Cadastros sem negócio</h2>
+              <p>Criaram a conta na página de divulgação e ainda não preencheram os dados do negócio.</p>
+            </div>
+          </header>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Contato</th>
+                <th>Cadastro</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pending.map(account => (
+                <tr key={account.id}>
+                  <td>
+                    <strong>{account.name}</strong>
+                  </td>
+                  <td>
+                    {account.email}
+                    <small>
+                      <a
+                        href={`https://wa.me/55${account.phone.replace(/^55/, '')}`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        {account.phone}
+                      </a>
+                    </small>
+                  </td>
+                  <td>{new Date(account.created_at).toLocaleDateString('pt-BR')}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       {creating && (
         <NewTenantModal

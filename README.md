@@ -104,10 +104,14 @@ O domínio principal (`SITE_DOMAIN`, ou o `BASE_DOMAIN` se vazio, e o `www.`)
 abre a página de divulgação do Pontual, servida pelo próprio painel:
 
 - o que o sistema faz, para quais ramos, telas de exemplo, preço e dúvidas;
-- **cadastro com teste grátis**: a pessoa escolhe o ramo, o nome, o endereço
-  (`<identificador>.BASE_DOMAIN`), o e-mail e a senha. O negócio nasce no ar na
-  hora, com os serviços de exemplo do ramo, e aparece no painel como
-  "cadastro pela página" (com o WhatsApp do responsável);
+- **cadastro em dois passos**: primeiro a conta (nome, e-mail, WhatsApp e
+  senha); depois, na área do cliente (`/conta`), o ramo, o nome e o endereço
+  (`<identificador>.BASE_DOMAIN`). O negócio nasce no ar na hora, com os
+  serviços de exemplo do ramo, e a pessoa entra nele com o mesmo e-mail e a
+  mesma senha da conta. Na área ela acompanha o teste e os links do sistema;
+- no painel, o negócio aparece como "cadastro pela página" (com o WhatsApp do
+  responsável) e as contas que ainda não criaram o negócio aparecem em
+  "Cadastros sem negócio";
 - **fim do teste**: sem pagamento registrado até o fim dos dias grátis, o
   negócio é suspenso sozinho (os dados ficam). Registrar o pagamento e
   reativar no painel devolve o acesso.

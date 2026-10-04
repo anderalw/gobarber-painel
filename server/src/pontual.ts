@@ -111,7 +111,8 @@ export const pontual = {
     name: string;
     custom_domain?: string | null;
     segment?: string;
-    admin: { name: string; email: string; password: string };
+    // password_hash: senha já cifrada (conta da página de divulgação)
+    admin: { name: string; email: string; password?: string; password_hash?: string };
   }) => json<ApiTenant>('/tenants', { method: 'POST', body: data }),
 
   update: (

@@ -820,3 +820,212 @@
     flex-direction: column;
   }
 }
+
+/* Cabeçalho: entrar */
+.mk-header-login {
+  color: var(--mk-text) !important;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.mk-header-spacer {
+  flex: 1;
+}
+
+.mk-header-user {
+  color: var(--mk-muted);
+  font-size: 14px;
+}
+
+.mk-modal-small {
+  max-width: 560px;
+  height: min(560px, 100%);
+}
+
+.mk-foot-link {
+  margin-right: auto;
+  align-self: center;
+  font-size: 14px;
+  font-weight: 600;
+}
+
+/* Área do cliente */
+.mk-account {
+  min-height: 100vh;
+}
+
+.mk-account-body {
+  padding-top: 48px;
+  padding-bottom: 64px;
+}
+
+.mk-account-narrow {
+  max-width: 560px;
+  margin: 0 auto;
+}
+
+.mk-account-card {
+  gap: 4px;
+  padding: 32px;
+}
+
+.mk-account-card h1 {
+  margin: 10px 0 4px;
+  font-size: 26px;
+  line-height: 1.25;
+}
+
+.mk-account-card .mk-sub {
+  margin: 0 0 20px;
+  font-size: 15px;
+}
+
+.mk-account-card .mk-pill {
+  align-self: flex-start;
+}
+
+.mk-account-card > .mk-btn {
+  width: 100%;
+}
+
+.mk-account-alt {
+  margin-top: 16px;
+  text-align: center;
+  font-size: 14px !important;
+}
+
+.mk-account-alt .mk-link {
+  margin: 0;
+}
+
+.mk-samples-line {
+  min-height: 22px;
+  margin: -6px 0 14px;
+  font-size: 13px !important;
+}
+
+.mk-account-card.mk-progress {
+  min-height: 320px;
+}
+
+.mk-account-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 20px;
+  align-items: start;
+}
+
+.mk-account-main {
+  padding: 28px;
+  gap: 14px;
+}
+
+.mk-account-title {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+}
+
+.mk-account-title h1 {
+  margin: 0;
+  font-size: 28px;
+  line-height: 1.2;
+}
+
+.mk-url {
+  font-size: 14px;
+}
+
+.mk-status {
+  flex-shrink: 0;
+  padding: 4px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.mk-status.ok {
+  background: rgba(62, 207, 142, 0.12);
+  color: #3ecf8e;
+}
+
+.mk-status.warn {
+  background: rgba(245, 184, 65, 0.12);
+  color: #f5b841;
+}
+
+.mk-status.bad {
+  background: rgba(240, 99, 99, 0.12);
+  color: #f06363;
+}
+
+.mk-notice {
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: rgba(255, 144, 0, 0.08);
+  color: var(--mk-text) !important;
+  font-size: 14px !important;
+}
+
+.mk-notice.bad {
+  background: rgba(240, 99, 99, 0.1);
+}
+
+.mk-account-main .mk-actions {
+  margin-top: 6px;
+}
+
+.mk-account-main .mk-note {
+  margin-top: 0;
+}
+
+.mk-account-h2 {
+  margin-top: 14px;
+  font-size: 18px !important;
+}
+
+.mk-account-side {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.mk-side-price {
+  font-size: 28px !important;
+  font-weight: 800;
+  color: var(--mk-text) !important;
+}
+
+.mk-side-price small {
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--mk-muted);
+}
+
+.mk-strong {
+  color: var(--mk-text) !important;
+  font-weight: 600;
+}
+
+@media (max-width: 860px) {
+  .mk-account-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 700px) {
+  .mk-header-user,
+  .mk-header-login {
+    display: none;
+  }
+
+  .mk-account-card,
+  .mk-account-main {
+    padding: 22px;
+  }
+
+  .mk-account-title {
+    flex-direction: column;
+  }
+}

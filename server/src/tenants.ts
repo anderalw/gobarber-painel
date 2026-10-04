@@ -299,8 +299,8 @@ export interface CreateTenant extends Billing {
   admin_name: string;
   admin_email: string;
   segment?: string;
-  // Cadastro pela página: a senha que a pessoa escolheu (não fica guardada)
-  admin_password?: string;
+  // Cadastro pela página: a senha da conta da pessoa, já cifrada (bcrypt)
+  admin_password_hash?: string;
   admin_phone?: string | null;
   origin?: Tenant['origin'];
 }
@@ -327,11 +327,11 @@ export async function createTenant(data: CreateTenant): Promise<{
 
   if (legacy) throw new PanelError(`Já existe um negócio com o identificador "${slug}".`);
 
-  const password = data.admin_password || readablePassword();
+  const password = readablePassword();
   const admin = {
     name: data.admin_name.trim(),
     email: data.admin_email.trim().toLowerCase(),
-    password,
+    ...(data.admin_password_hash ? { password_hash: data.admin_password_hash } : { password }),
   };
 
   const api = await guard(() =>
@@ -351,8 +351,8 @@ export async function createTenant(data: CreateTenant): Promise<{
     admin_name: admin.name,
     admin_email: admin.email,
     admin_phone: data.admin_phone || null,
-    // A senha escolhida pela pessoa não fica no painel
-    initial_password: data.admin_password ? null : password,
+    // Com a senha da conta da pessoa, não há senha inicial para mostrar
+    initial_password: data.admin_password_hash ? null : password,
   });
 
   return { tenant: view(tenant), admin_password: password };

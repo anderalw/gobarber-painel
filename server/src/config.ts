@@ -49,6 +49,9 @@ export const config = {
     priceCents: Number(env.SIGNUP_PRICE_CENTS || 9900),
     autoSuspend: env.TRIAL_AUTO_SUSPEND !== 'false',
   },
+
+  // WhatsApp de contato (com DDI, só números) para quem quer continuar
+  supportWhatsapp: (env.SUPPORT_WHATSAPP || '').replace(/\D/g, ''),
 };
 
 export type Config = typeof config;

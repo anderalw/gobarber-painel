@@ -34,7 +34,16 @@ import {
   suspend,
   syncWithApi,
 } from './tenants';
-import { checkSlug, expireTrials, publicInfo, signup } from './signup';
+import { checkSlug, expireTrials, publicInfo } from './signup';
+import {
+  accountView,
+  createBusiness,
+  currentAccount,
+  loginAccount,
+  logout,
+  pendingAccounts,
+  signupAccount,
+} from './accounts';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const webDist = path.resolve(here, '..', '..', 'web', 'dist');
@@ -108,31 +117,70 @@ api.get('/public/slug', (request, response) => {
   response.json(checkSlug(String(request.query.value || '')));
 });
 
+// Conta de quem se cadastra: criar, entrar, sair e os dados do negócio
 api.post(
-  '/public/signup',
+  '/account/signup',
   handle(async (request, response) => {
     const body = request.body || {};
 
     return response.status(201).json(
-      await signup(
-        {
-          business_name: String(body.business_name || ''),
-          segment: String(body.segment || 'barbershop'),
-          slug: String(body.slug || ''),
-          name: String(body.name || ''),
-          email: String(body.email || ''),
-          phone: String(body.phone || ''),
-          password: String(body.password || ''),
-          accepted_terms: body.accepted_terms === true,
-          website: body.website ? String(body.website) : undefined,
-        },
-        request.ip || '',
-      ),
+      await signupAccount(request, response, {
+        name: String(body.name || ''),
+        email: String(body.email || ''),
+        phone: String(body.phone || ''),
+        password: String(body.password || ''),
+        accepted_terms: body.accepted_terms === true,
+        website: body.website ? String(body.website) : undefined,
+      }),
+    );
+  }),
+);
+
+api.post(
+  '/account/login',
+  handle(async (request, response) => {
+    const body = request.body || {};
+
+    return response.json(
+      await loginAccount(request, response, {
+        email: String(body.email || ''),
+        password: String(body.password || ''),
+      }),
+    );
+  }),
+);
+
+api.post('/account/logout', (request, response) => {
+  logout(response);
+  response.status(204).send();
+});
+
+api.get(
+  '/account',
+  handle((request, response) => response.json(accountView(currentAccount(request)))),
+);
+
+api.post(
+  '/account/business',
+  handle(async (request, response) => {
+    const body = request.body || {};
+
+    return response.status(201).json(
+      await createBusiness(currentAccount(request), {
+        business_name: String(body.business_name || ''),
+        segment: String(body.segment || 'barbershop'),
+        slug: String(body.slug || ''),
+      }),
     );
   }),
 );
 
 api.use(requireAuth);
+
+// Contas da página que ainda não criaram o negócio (para entrar em contato)
+api.get('/accounts/pending', (request, response) => {
+  response.json(pendingAccounts());
+});
 
 api.get(
   '/overview',

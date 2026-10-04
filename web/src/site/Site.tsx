@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 
 import { api } from '../api';
 import SignupModal from './SignupModal';
+import Account from './Account';
+import { accountPath, isAccountPage } from './paths';
 import './site.css';
 
 // Página de divulgação do Pontual (no domínio principal): o que o sistema
@@ -19,6 +21,7 @@ export interface PublicInfo {
   trial_days: number;
   price_cents: number;
   base_domain: string;
+  support_whatsapp?: string | null;
   segments: Segment[];
 }
 
@@ -168,6 +171,9 @@ export default function Site() {
   }, []);
 
   const start = (segment?: string) => setSignup(segment || info.segments[0]?.key || 'barbershop');
+
+  // Área do cliente (conta e dados do negócio)
+  if (isAccountPage()) return <Account info={info} />;
   const current = EXAMPLES.find(item => item.key === example) || EXAMPLES[0];
 
   return (
@@ -184,6 +190,9 @@ export default function Site() {
             <a href="#exemplos">Exemplos</a>
             <a href="#preco">Preço</a>
           </nav>
+          <a href={accountPath()} className="mk-header-login">
+            Entrar
+          </a>
           <button type="button" className="mk-btn mk-btn-primary mk-btn-small" onClick={() => start()}>
             Testar grátis
           </button>
@@ -208,7 +217,7 @@ export default function Site() {
                   Ver como funciona
                 </a>
               </div>
-              <p className="mk-note">Seu sistema fica no ar em menos de um minuto.</p>
+              <p className="mk-note">Crie sua conta, preencha os dados do negócio e o sistema entra no ar na hora.</p>
             </div>
             <figure className="mk-frame">
               <div className="mk-frame-bar">
@@ -306,8 +315,8 @@ export default function Site() {
             <h2>Do cadastro ao primeiro agendamento</h2>
             <ol className="mk-steps">
               <li>
-                <strong>Cadastre-se</strong>
-                <p>Nome do negócio, ramo e o endereço que você quer. Leva dois minutos.</p>
+                <strong>Crie sua conta</strong>
+                <p>Nome, e-mail, WhatsApp e senha. Depois, na sua área, o nome do negócio, o ramo e o endereço.</p>
               </li>
               <li>
                 <strong>Seu sistema entra no ar</strong>
